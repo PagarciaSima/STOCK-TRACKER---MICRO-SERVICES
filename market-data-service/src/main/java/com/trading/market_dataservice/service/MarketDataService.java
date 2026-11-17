@@ -123,7 +123,6 @@ public class MarketDataService {
                     .setScale(2, RoundingMode.HALF_UP);
             
             // Update high/low
-
             BigDecimal newHigh = newPrice
                     .compareTo(currentPrice.getHigh()) > 0
                     ? newPrice : currentPrice.getHigh();
@@ -143,11 +142,11 @@ public class MarketDataService {
             redisTemplate.opsForValue().set(
                 PRICE_KEY_PREFIX + symbol, currentPrice);
             
-            // 2. Broadcast via WebSocket -> all clients
+            // 2. Broadcast via WebSocket -> all clients (frontend) subscribed to this topic will receive the update
             messagingTemplate.convertAndSend(
                 "/topic/prices/" + symbol, currentPrice);
 
-            // Publish to Kafka
+            // Publish to Kafka -> other microservices can consume this event
             Map<String, Object> priceUpdatedEvent = new HashMap<>();
             priceUpdatedEvent.put("symbol", symbol);
             priceUpdatedEvent.put("price", newPrice);
