@@ -1,10 +1,9 @@
 package com.trading.user.service.service;
 
+
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.Date;
-import java.util.HashMap;
-import java.util.Map;
 
 import javax.crypto.SecretKey;
 
@@ -14,8 +13,10 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
 import com.trading.user.service.dto.AuthResponse;
+import com.trading.user.service.dto.FundsOperationResponse;
 import com.trading.user.service.dto.LoginRequest;
 import com.trading.user.service.dto.RegisterRequest;
+import com.trading.user.service.dto.UserRegisteredEvent;
 import com.trading.user.service.dto.UserResponse;
 import com.trading.user.service.entity.User;
 import com.trading.user.service.repository.UserRepository;
@@ -31,84 +32,145 @@ import lombok.extern.slf4j.Slf4j;
 @RequiredArgsConstructor
 public class UserService {
 
-	@Value("${jwt.secret}")
-	private String secret;
+    @Value("${jwt.secret}")
+    private String secret;
 
-	@Value("${jwt.expiration}")
-	private long jwtExpiration;
-	
-	@Value("${jwt.refresh-expiration}")
-	private long refreshExpiration;
-	
+    @Value("${jwt.expiration}")
+    private long jwtExpiration;
+
+    @Value("${jwt.refresh-expiration}")
+    private long refreshExpiration;
+
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
-    private final KafkaTemplate<String, Object> kafkaTemplate;
+    private final KafkaTemplate<String, UserRegisteredEvent> kafkaTemplate;
     private static final String USER_REGISTERED_TOPIC = "user.registered";
-    
-    public AuthResponse register(RegisterRequest request){
 
+    /**
+     * Register a new user.
+     * <p>
+     * Flow:
+     * <ol>
+     *     <li>Validate that the email is unique.</li>
+     *     <li>Create and persist the user entity.</li>
+     *     <li>Publish a {@code user.registered} Kafka event.</li>
+     *     <li>Generate access and refresh JWT tokens.</li>
+     *     <li>Build the authentication response.</li>
+     * </ol>
+     *
+     * @param request the registration request containing email, password, firstName,
+     *                lastName and optional initialDeposit.
+     *                {@code email} must be valid and unique; {@code password} must not be blank.
+     * @return the authentication response with tokens and user data.
+     * @throws RuntimeException if the email is already registered.
+     */
+    public AuthResponse register(RegisterRequest request) {
         log.info("Registering user: {}", request.getEmail());
 
-        if(userRepository.existsByEmail(request.getEmail())){
-            throw new RuntimeException(
-                "Email already registered "+request.getEmail());
-        }
+        validateEmailUnique(request.getEmail());
+        User user = createUserEntity(request);
+        User savedUser = userRepository.save(user);
+        log.info("User registered: {}", savedUser.getId());
 
+        publishUserRegisteredEvent(savedUser);
+
+        String[] tokens = generateTokens(savedUser.getId(), savedUser.getEmail());
+        return buildAuthResponse(savedUser, tokens[0], tokens[1]);
+    }
+
+    /**
+     * Validate that the email is not already registered.
+     *
+     * @param email the email to validate. Cannot be null or blank.
+     * @throws RuntimeException if the email is already registered.
+     */
+    private void validateEmailUnique(String email) {
+        if (userRepository.existsByEmail(email)) {
+            throw new RuntimeException("Email already registered " + email);
+        }
+    }
+
+    /**
+     * Create a {@link User} entity from the registration request.
+     *
+     * @param request the registration request. Cannot be null.
+     * @return a new (unsaved) {@link User} entity.
+     */
+    private User createUserEntity(RegisterRequest request) {
         User user = new User();
         user.setFirstName(request.getFirstName());
         user.setLastName(request.getLastName());
         user.setEmail(request.getEmail());
         user.setPassword(passwordEncoder.encode(request.getPassword()));
         user.setWalletBalance(
-                request.getInitialDeposit() != null 
-                ? request.getInitialDeposit() 
-                : BigDecimal.valueOf(10000)
+                request.getInitialDeposit() != null
+                        ? request.getInitialDeposit()
+                        // initial fictitious balance
+                        : BigDecimal.valueOf(10000)
         );
-        
-        User savedUser = userRepository.save(user);
-        
-        log.info("User registered: {}", savedUser.getId());
-
-        // Publish user.registered event
-        Map<String, Object> userRegisteredEvent = new HashMap<>();
-        userRegisteredEvent.put("userId", savedUser.getId());
-        userRegisteredEvent.put("email", savedUser.getEmail());
-        userRegisteredEvent.put("firstName", savedUser.getFirstName());
-        userRegisteredEvent.put("lastName", savedUser.getLastName());
-        userRegisteredEvent.put("walletBalance", savedUser.getWalletBalance());
-
-        kafkaTemplate.send(USER_REGISTERED_TOPIC, savedUser.getId(), userRegisteredEvent);
-        
-        String token = generateAccessToken(savedUser.getId(), savedUser.getEmail());
-        String refreshToken = generateRefreshToken(savedUser.getId());
-        
-        return buildAuthResponse(savedUser, token, refreshToken);
+        return user;
     }
-    
-    /**
-     * Login
-     */
-    public AuthResponse login(LoginRequest request){
 
+    /**
+     * Publish a typed {@link UserRegisteredEvent} to the {@code user.registered} Kafka topic.
+     *
+     * @param savedUser the saved user. Cannot be null.
+     */
+    private void publishUserRegisteredEvent(User savedUser) {
+        UserRegisteredEvent event = new UserRegisteredEvent(
+                savedUser.getId(),
+                savedUser.getEmail(),
+                savedUser.getFirstName(),
+                savedUser.getLastName(),
+                savedUser.getWalletBalance()
+        );
+        kafkaTemplate.send(USER_REGISTERED_TOPIC, savedUser.getId(), event);
+        log.debug("Published user.registered event for user: {}", savedUser.getId());
+    }
+
+    /**
+     * Generate access and refresh JWT tokens for a user.
+     *
+     * @param userId  the identifier of the user. Cannot be null or blank.
+     * @param email   the email of the user (used as JWT subject). Cannot be null or blank.
+     * @return an array where [0] is the access token and [1] is the refresh token.
+     */
+    private String[] generateTokens(String userId, String email) {
+        String accessToken = generateAccessToken(userId, email);
+        String refreshToken = generateRefreshToken(userId);
+        return new String[]{accessToken, refreshToken};
+    }
+
+    /**
+     * Login a user with email and password.
+     *
+     * @param request the login request containing email and password.
+     *                {@code email} must be valid; {@code password} must not be blank.
+     * @return the authentication response with tokens and user data.
+     * @throws RuntimeException if the user is not found or the password is invalid.
+     */
+    public AuthResponse login(LoginRequest request) {
         log.info("Login attempt: {}", request.getEmail());
 
         User user = userRepository.findByEmail(request.getEmail())
-        		.orElseThrow(() -> new RuntimeException("User not found " + request.getEmail()));
-        if(!passwordEncoder.matches(
-        		request.getPassword(), user.getPassword()
-        )) {
-        	throw new RuntimeException("Invalid credentials");
+                .orElseThrow(() -> new RuntimeException("User not found " + request.getEmail()));
+        if (!passwordEncoder.matches(request.getPassword(), user.getPassword())) {
+            throw new RuntimeException("Invalid password for " + request.getEmail());
         }
-        
-        log.info("login successful for user: {}", user.getId());
-        
-        String token = generateAccessToken(user.getId(), user.getEmail());
 
-        String refreshToken = generateRefreshToken(user.getId());
-
-        return buildAuthResponse(user, token, refreshToken);
+        String[] tokens = generateTokens(user.getId(), user.getEmail());
+        return buildAuthResponse(user, tokens[0], tokens[1]);
     }
-    
+
+    /**
+     * Generate a signed JWT access token.
+     *
+     * @param userId  the identifier of the user (stored in the "userId" claim).
+     *                Cannot be null or blank.
+     * @param email   the email of the user (used as JWT subject).
+     *                Cannot be null or blank.
+     * @return the signed access token string.
+     */
     private String generateAccessToken(String userId, String email) {
         Instant now = Instant.now();
         Instant expiry = now.plusMillis(jwtExpiration);
@@ -120,81 +182,109 @@ public class UserService {
                 .expiration(Date.from(expiry))
                 .signWith(getSignInKey())
                 .compact();
-	}
-    
-    private SecretKey getSignInKey(){
-        byte[] keyBytes = Decoders.BASE64.decode(secret);
-        return Keys.hmacShaKeyFor(keyBytes);
     }
 
-    private String generateRefreshToken(String userId){
+    /**
+     * Generate a signed JWT refresh token.
+     *
+     * @param userId the identifier of the user (stored in the "userId" claim and subject).
+     *               Cannot be null or blank.
+     * @return the signed refresh token string.
+     */
+    private String generateRefreshToken(String userId) {
         Instant now = Instant.now();
         Instant expiry = now.plusMillis(refreshExpiration);
 
         return Jwts.builder()
                 .claim("userId", userId)
-                .subject(userId)              
-                .issuedAt(Date.from(now))     
+                .subject(userId)
+                .issuedAt(Date.from(now))
                 .expiration(Date.from(expiry))
-                .signWith(getSignInKey())     
+                .signWith(getSignInKey())
                 .compact();
     }
 
-	/**
-     * Get User By Id.
-     * Called by other services via Feign (internal)
-     * @param userId
-     * @return
+    private SecretKey getSignInKey() {
+        byte[] keyBytes = Decoders.BASE64.decode(secret);
+        return Keys.hmacShaKeyFor(keyBytes);
+    }
+
+    /**
+     * Get user by identifier. Called by other services via Feign (internal).
+     *
+     * @param userId the identifier of the user. Cannot be null or blank.
+     * @return the mapped
+     * @throws RuntimeException if the user is not found.
      */
-    public UserResponse getUserById(String userId){
+    public UserResponse getUserById(String userId) {
         User user = userRepository.findById(userId)
-                .orElseThrow(() -> new RuntimeException(
-                        "User not found: "+ userId));
+                .orElseThrow(() -> new RuntimeException("User not found: " + userId));
 
         return mapToResponse(user);
     }
-    
-    public UserResponse addFunds(String userId, BigDecimal amount){
+
+    /**
+     * Add funds to a user's wallet.
+     *
+     * @param userId the identifier of the user. Cannot be null or blank.
+     * @param amount the amount to add. Cannot be null or negative.
+     * @return a {@link FundsOperationResponse} with the new balance.
+     * @throws RuntimeException if the user is not found.
+     */
+    public FundsOperationResponse addFunds(String userId, BigDecimal amount) {
         User user = userRepository.findById(userId)
-                .orElseThrow(() -> new RuntimeException(
-                        "User not found: " + userId));
+                .orElseThrow(() -> new RuntimeException("User not found: " + userId));
 
         user.setWalletBalance(user.getWalletBalance().add(amount));
         User savedUser = userRepository.save(user);
 
         log.info("Funds added: {} to user: {}", amount, userId);
-        return mapToResponse(savedUser);
+        return new FundsOperationResponse(savedUser.getId(), savedUser.getWalletBalance(), true);
     }
-    
-    public UserResponse deductFunds(String userId, BigDecimal amount){
-        User user = userRepository.findById(userId)
-                .orElseThrow(() -> new RuntimeException(
-                        "User not found: " + userId));
 
-        if(user.getWalletBalance().compareTo(amount)<0){
+    /**
+     * Deduct funds from a user's wallet.
+     *
+     * @param userId the identifier of the user. Cannot be null or blank.
+     * @param amount the amount to deduct. Cannot be null or negative.
+     * @return a {@link FundsOperationResponse} with the new balance.
+     * @throws RuntimeException if the user is not found or there are insufficient funds.
+     */
+    public FundsOperationResponse deductFunds(String userId, BigDecimal amount) {
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new RuntimeException("User not found: " + userId));
+
+        if (user.getWalletBalance().compareTo(amount) < 0) {
             throw new RuntimeException("Insufficient wallet Balance");
         }
 
         user.setWalletBalance(user.getWalletBalance().subtract(amount));
         User savedUser = userRepository.save(user);
 
-        log.info("Funds deducted: {} to user: {}", amount, userId);
-        return mapToResponse(savedUser);
+        log.info("Funds deducted: {} from user: {}", amount, userId);
+        return new FundsOperationResponse(savedUser.getId(), savedUser.getWalletBalance(), true);
     }
-    
-    public UserResponse creditFunds(String userId, BigDecimal amount){
+
+    /**
+     * Credit funds to a user's wallet (used for SELL orders).
+     *
+     * @param userId the identifier of the user. Cannot be null or blank.
+     * @param amount the amount to credit. Cannot be null or negative.
+     * @return a {@link FundsOperationResponse} with the new balance.
+     * @throws RuntimeException if the user is not found.
+     */
+    public FundsOperationResponse creditFunds(String userId, BigDecimal amount) {
         User user = userRepository.findById(userId)
-                .orElseThrow(() -> new RuntimeException(
-                        "User not found: " + userId));
+                .orElseThrow(() -> new RuntimeException("User not found: " + userId));
 
         user.setWalletBalance(user.getWalletBalance().add(amount));
         User savedUser = userRepository.save(user);
 
         log.info("Funds credited: {} to user: {}", amount, userId);
-        return mapToResponse(savedUser);
+        return new FundsOperationResponse(savedUser.getId(), savedUser.getWalletBalance(), true);
     }
-    
-    private AuthResponse buildAuthResponse(User user, String token, String refreshToken){
+
+    private AuthResponse buildAuthResponse(User user, String token, String refreshToken) {
         AuthResponse response = new AuthResponse();
         response.setAccessToken(token);
         response.setUserId(user.getId());
@@ -206,8 +296,8 @@ public class UserService {
 
         return response;
     }
-    
-    private UserResponse mapToResponse(User user){
+
+    private UserResponse mapToResponse(User user) {
         UserResponse response = new UserResponse();
         response.setId(user.getId());
         response.setEmail(user.getEmail());

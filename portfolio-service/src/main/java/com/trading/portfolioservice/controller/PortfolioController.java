@@ -1,6 +1,5 @@
 package com.trading.portfolioservice.controller;
 
-import java.util.Map;
 
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -10,6 +9,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.trading.portfolioservice.service.PortfolioService;
+import com.trading.portfolioservice.dto.PortfolioResponse;
 
 import lombok.RequiredArgsConstructor;
 
@@ -26,7 +26,7 @@ public class PortfolioController {
      * @return
      */
     @GetMapping("/me")
-    public ResponseEntity<Map<String, Object>> getMyPortfolio(
+    public ResponseEntity<PortfolioResponse> getMyPortfolio(
             @RequestHeader("X-User-Id") String userId) {
 
         return ResponseEntity.ok(
@@ -39,7 +39,7 @@ public class PortfolioController {
      * @return
      */
     @GetMapping("/{userId}")
-    public ResponseEntity<Map<String, Object>> getPortfolio(
+    public ResponseEntity<PortfolioResponse> getPortfolio(
             @PathVariable String userId) {
         return ResponseEntity.ok(
                 portfolioService.getPortfolio(userId));

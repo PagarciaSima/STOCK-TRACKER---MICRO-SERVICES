@@ -12,6 +12,7 @@ import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestParam;
 
 import com.trading.user.service.dto.AuthResponse;
+import com.trading.user.service.dto.FundsOperationResponse;
 import com.trading.user.service.dto.LoginRequest;
 import com.trading.user.service.dto.RegisterRequest;
 import com.trading.user.service.dto.UserResponse;
@@ -55,7 +56,7 @@ public class UserController {
     }
     
     @PostMapping("/{userId}/funds/add")
-    public ResponseEntity<UserResponse> addFunds(
+    public ResponseEntity<FundsOperationResponse> addFunds(
             @PathVariable String userId,
             @RequestParam BigDecimal amount){
 
@@ -64,7 +65,7 @@ public class UserController {
     }
     
     @PostMapping("/{userId}/funds/deduct")
-    public ResponseEntity<UserResponse> deductFunds(
+    public ResponseEntity<FundsOperationResponse> deductFunds(
             @PathVariable String userId,
             @RequestParam BigDecimal amount){
 
@@ -73,7 +74,7 @@ public class UserController {
     }
     
     @PostMapping("/{userId}/funds/credit")
-    public ResponseEntity<UserResponse> creditFunds(
+    public ResponseEntity<FundsOperationResponse> creditFunds(
             @PathVariable String userId,
             @RequestParam BigDecimal amount){
 

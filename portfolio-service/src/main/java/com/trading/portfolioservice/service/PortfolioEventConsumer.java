@@ -2,13 +2,13 @@ package com.trading.portfolioservice.service;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
-import java.util.Map;
 
 import org.springframework.kafka.annotation.KafkaListener;
 import org.springframework.messaging.handler.annotation.Payload;
 import org.springframework.stereotype.Service;
 
 import com.trading.portfolioservice.entity.Holding;
+import com.trading.portfolioservice.dto.OrderEvent;
 import com.trading.portfolioservice.repository.HoldingRepository;
 
 import lombok.RequiredArgsConstructor;
@@ -22,15 +22,15 @@ public class PortfolioEventConsumer {
 	private final HoldingRepository holdingRepository;
 
 	@KafkaListener(topics = "order-executed")
-	public void consumeOrderExecuted(@Payload Map<String, Object> payload) {
+	public void consumeOrderExecuted(@Payload OrderEvent payload) {
 
 		try {
-			String userId = (String) payload.get("userId");
-			String symbol = (String) payload.get("symbol");
-			String type = (String) payload.get("type");
+			String userId = payload.userId();
+			String symbol = payload.symbol();
+			String type = payload.type();
 
-			int quantity = Integer.parseInt(payload.get("quantity").toString());
-			BigDecimal price = new BigDecimal(payload.get("price").toString());
+			int quantity = payload.quantity();
+			BigDecimal price = payload.price();
 
 			log.info("Updating portfolio - user: {} {} x {} at {}", userId, symbol, quantity, price);
 			if ("BUY".equals(type)) {
