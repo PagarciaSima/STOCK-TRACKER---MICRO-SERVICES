@@ -3,7 +3,6 @@ package com.trading.market_dataservice.service;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.LocalDateTime;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Random;
@@ -14,6 +13,7 @@ import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.scheduling.annotation.Scheduled;
 
+import com.trading.market_dataservice.dto.PriceUpdatedEvent;
 import com.trading.market_dataservice.dto.StockPrice;
 import com.trading.market_dataservice.entity.Stock;
 import com.trading.market_dataservice.repository.StockRepository;
@@ -30,7 +30,7 @@ public class MarketDataService {
 	private final Random random = new Random();
 	private final RedisTemplate<String, Object> redisTemplate;
 	private final SimpMessagingTemplate messagingTemplate;
-	private final KafkaTemplate<String, Object> kafkaTemplate;
+	private final KafkaTemplate<String, PriceUpdatedEvent> kafkaTemplate;
 
 	private static final String PRICE_KEY_PREFIX = "stock:price:";
 	private static final String PRICE_UPDATED_TOPIC = "stock.price.updated";
@@ -147,11 +147,10 @@ public class MarketDataService {
                 "/topic/prices/" + symbol, currentPrice);
 
             // Publish to Kafka -> other microservices can consume this event
-            Map<String, Object> priceUpdatedEvent = new HashMap<>();
-            priceUpdatedEvent.put("symbol", symbol);
-            priceUpdatedEvent.put("price", newPrice);
-            priceUpdatedEvent.put("timestamp",
-                    LocalDateTime.now().toString());
+            PriceUpdatedEvent priceUpdatedEvent = new PriceUpdatedEvent(
+                    symbol,
+                    newPrice,
+                    LocalDateTime.now());
 
             kafkaTemplate.send(PRICE_UPDATED_TOPIC, symbol, priceUpdatedEvent);
         });
