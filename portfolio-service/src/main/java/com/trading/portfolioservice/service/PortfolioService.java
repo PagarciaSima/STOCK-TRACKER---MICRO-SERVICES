@@ -31,52 +31,34 @@ public class PortfolioService {
      * For each holding of the user, resolves the current market price, computes
      * the holding value, invested amount, P&L and P&L percentage, then aggregates
      * the totals across all holdings.
+     * <p>
+     * <b>Performance note (N+1):</b> today we call the market-data service once per
+     * holding inside the loop. For portfolios with many holdings this should evolve
+     * to a batch price endpoint or parallel calls with {@code CompletableFuture}.
      *
      * @param userId the identifier of the user. Cannot be null or blank.
      * @return a {@link PortfolioResponse} with holdings and aggregated P&L metrics.
      *         Never null.
      */
     public PortfolioResponse getPortfolio(String userId) {
-        List<Holding> holdings = holdingRepository
-                .findByUserId(userId);
+        List<Holding> holdings = holdingRepository.findByUserId(userId);
 
         List<HoldingItem> portfolioItems = new ArrayList<>();
-
-        BigDecimal totalInvested = BigDecimal.ZERO;
-        BigDecimal currentValue = BigDecimal.ZERO;
-
         for (Holding holding : holdings) {
-            try {
-                // Get current market price
-                StockPriceResponse priceData = marketDataClient
-                        .getStockPrice(holding.getSymbol());
-
-                BigDecimal currentPrice = priceData.price();
-
-                BigDecimal holdingValue = currentPrice.multiply(
-                        BigDecimal.valueOf(holding.getQuantity()));
-                BigDecimal invested = holding.getTotalInvested();
-                // Profit & loss
-                BigDecimal pnl = holdingValue.subtract(invested);
-
-                BigDecimal pnlPercent = pnl.divide(invested, 4, RoundingMode.HALF_UP)
-                        .multiply(BigDecimal.valueOf(100))
-                        .setScale(2, RoundingMode.HALF_UP);
-
-                HoldingItem item = setItem(holding, currentPrice, holdingValue,
-                        invested, pnl, pnlPercent);
+            HoldingItem item = calculateHoldingItem(holding);
+            if (item != null) {
                 portfolioItems.add(item);
-                totalInvested = totalInvested.add(invested);
-                currentValue = currentValue.add(holdingValue);
-            } catch (Exception e) {
-                log.error("Error fetching price for {}: {}",
-                        holding.getSymbol(), e.getMessage());
             }
         }
 
+        BigDecimal totalInvested = portfolioItems.stream()
+                .map(HoldingItem::invested)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+        BigDecimal currentValue = portfolioItems.stream()
+                .map(HoldingItem::currentValue)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
         BigDecimal totalPnl = currentValue.subtract(totalInvested);
-        BigDecimal totalPnLPercent = totalInvested
-                .compareTo(BigDecimal.ZERO) > 0
+        BigDecimal totalPnLPercent = totalInvested.compareTo(BigDecimal.ZERO) > 0
                 ? totalPnl.divide(totalInvested, 4, RoundingMode.HALF_UP)
                         .multiply(BigDecimal.valueOf(100))
                         .setScale(2, RoundingMode.HALF_UP)
@@ -90,6 +72,42 @@ public class PortfolioService {
                 totalPnl,
                 totalPnLPercent,
                 totalPnl.compareTo(BigDecimal.ZERO) > 0);
+    }
+
+    /**
+     * Calculates the {@link HoldingItem} for a single holding.
+     * <p>
+     * Resolves the current market price from the market-data service and computes
+     * the holding's current value, invested amount, P&L and P&L percentage.
+     * The division for P&L percentage is protected against a zero invested amount.
+     *
+     * @param holding the holding entity. Cannot be null.
+     * @return a {@link HoldingItem} with computed values, or {@code null} if the
+     *         market price could not be resolved (the holding is skipped in the
+     *         portfolio aggregation).
+     */
+    private HoldingItem calculateHoldingItem(Holding holding) {
+        try {
+            // Get current market price (one Feign call per holding -> see N+1 note in getPortfolio)
+            StockPriceResponse priceData = marketDataClient.getStockPrice(holding.getSymbol());
+            BigDecimal currentPrice = priceData.price();
+
+            BigDecimal holdingValue = currentPrice.multiply(
+                    BigDecimal.valueOf(holding.getQuantity()));
+            BigDecimal invested = holding.getTotalInvested();
+            BigDecimal pnl = holdingValue.subtract(invested);
+
+            BigDecimal pnlPercent = invested.compareTo(BigDecimal.ZERO) > 0
+                    ? pnl.divide(invested, 4, RoundingMode.HALF_UP)
+                            .multiply(BigDecimal.valueOf(100))
+                            .setScale(2, RoundingMode.HALF_UP)
+                    : BigDecimal.ZERO;
+
+            return setItem(holding, currentPrice, holdingValue, invested, pnl, pnlPercent);
+        } catch (Exception e) {
+            log.error("Error fetching price for {}: {}", holding.getSymbol(), e.getMessage());
+            return null;
+        }
     }
 
     /**
