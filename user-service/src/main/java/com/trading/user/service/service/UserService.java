@@ -1,9 +1,14 @@
 package com.trading.user.service.service;
 
 import java.math.BigDecimal;
+import java.time.Instant;
+import java.util.Date;
 import java.util.HashMap;
 import java.util.Map;
 
+import javax.crypto.SecretKey;
+
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
@@ -15,6 +20,9 @@ import com.trading.user.service.dto.UserResponse;
 import com.trading.user.service.entity.User;
 import com.trading.user.service.repository.UserRepository;
 
+import io.jsonwebtoken.Jwts;
+import io.jsonwebtoken.io.Decoders;
+import io.jsonwebtoken.security.Keys;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 
@@ -23,6 +31,15 @@ import lombok.extern.slf4j.Slf4j;
 @RequiredArgsConstructor
 public class UserService {
 
+	@Value("${jwt.secret}")
+	private String secret;
+
+	@Value("${jwt.expiration}")
+	private long jwtExpiration;
+	
+	@Value("${jwt.refresh-expiration}")
+	private long refreshExpiration;
+	
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
     private final KafkaTemplate<String, Object> kafkaTemplate;
@@ -92,7 +109,38 @@ public class UserService {
         return buildAuthResponse(user, token, refreshToken);
     }
     
-    /**
+    private String generateAccessToken(String userId, String email) {
+        Instant now = Instant.now();
+        Instant expiry = now.plusMillis(jwtExpiration);
+
+        return Jwts.builder()
+                .claim("userId", userId)
+                .subject(email)
+                .issuedAt(Date.from(now))
+                .expiration(Date.from(expiry))
+                .signWith(getSignInKey())
+                .compact();
+	}
+    
+    private SecretKey getSignInKey(){
+        byte[] keyBytes = Decoders.BASE64.decode(secret);
+        return Keys.hmacShaKeyFor(keyBytes);
+    }
+
+    private String generateRefreshToken(String userId){
+        Instant now = Instant.now();
+        Instant expiry = now.plusMillis(refreshExpiration);
+
+        return Jwts.builder()
+                .claim("userId", userId)
+                .subject(userId)              
+                .issuedAt(Date.from(now))     
+                .expiration(Date.from(expiry))
+                .signWith(getSignInKey())     
+                .compact();
+    }
+
+	/**
      * Get User By Id.
      * Called by other services via Feign (internal)
      * @param userId
@@ -146,8 +194,17 @@ public class UserService {
         return mapToResponse(savedUser);
     }
     
-    private AuthResponse buildAuthResponse(User user, String token, String refreshToken) {
+    private AuthResponse buildAuthResponse(User user, String token, String refreshToken){
         AuthResponse response = new AuthResponse();
+        response.setAccessToken(token);
+        response.setUserId(user.getId());
+        response.setEmail(user.getEmail());
+        response.setFirstName(user.getFirstName());
+        response.setLastName(user.getLastName());
+        response.setRefreshToken(refreshToken);
+        response.setWalletBalance(user.getWalletBalance());
+
+        return response;
     }
     
     private UserResponse mapToResponse(User user){

@@ -21,9 +21,11 @@ server:
   port: 8081
 
 jwt:
-  secret:
-  expiration:
-  refresh-expiration:
+  secret: qNiwobQFrXWDou6EIWAhman5n771RqZlCltkMgbYptc=
+  # 1 hour
+  expiration: "1 * 60 * 60 * 1000"
+  # 24 hour
+  refresh-expiration: "24 * 60 * 60 * 1000"
 
 management:
   endpoints:
