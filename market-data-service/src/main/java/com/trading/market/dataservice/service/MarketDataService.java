@@ -1,4 +1,4 @@
-package com.trading.market_dataservice.service;
+package com.trading.market.dataservice.service;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
@@ -13,10 +13,10 @@ import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.scheduling.annotation.Scheduled;
 
-import com.trading.market_dataservice.dto.PriceUpdatedEvent;
-import com.trading.market_dataservice.dto.StockPrice;
-import com.trading.market_dataservice.entity.Stock;
-import com.trading.market_dataservice.repository.StockRepository;
+import com.trading.market.dataservice.dto.PriceUpdatedEvent;
+import com.trading.market.dataservice.dto.StockPrice;
+import com.trading.market.dataservice.entity.Stock;
+import com.trading.market.dataservice.repository.StockRepository;
 
 import jakarta.annotation.PostConstruct;
 import lombok.RequiredArgsConstructor;

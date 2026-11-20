@@ -1,4 +1,4 @@
-package com.trading.market_dataservice.exception;
+package com.trading.market.dataservice.exception;
 
 /**
  * Detail of a single invalid field in a request.

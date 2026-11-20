@@ -1,4 +1,4 @@
-package com.trading.market_dataservice.dto;
+package com.trading.market.dataservice.dto;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;

@@ -1,4 +1,4 @@
-package com.trading.market_dataservice.config;
+package com.trading.market.dataservice.config;
 
 import org.springframework.context.annotation.Configuration;
 import org.springframework.messaging.simp.config.MessageBrokerRegistry;

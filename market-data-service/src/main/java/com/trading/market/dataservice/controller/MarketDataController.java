@@ -1,4 +1,4 @@
-package com.trading.market_dataservice.controller;
+package com.trading.market.dataservice.controller;
 
 import java.util.List;
 
@@ -8,9 +8,9 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
-import com.trading.market_dataservice.dto.StockPrice;
-import com.trading.market_dataservice.entity.Stock;
-import com.trading.market_dataservice.service.MarketDataService;
+import com.trading.market.dataservice.dto.StockPrice;
+import com.trading.market.dataservice.entity.Stock;
+import com.trading.market.dataservice.service.MarketDataService;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;

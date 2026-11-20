@@ -1,4 +1,4 @@
-package com.trading.market_dataservice.exception;
+package com.trading.market.dataservice.exception;
 
 import java.util.List;
 

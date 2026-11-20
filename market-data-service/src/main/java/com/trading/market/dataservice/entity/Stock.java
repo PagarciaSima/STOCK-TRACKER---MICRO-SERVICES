@@ -1,4 +1,4 @@
-package com.trading.market_dataservice.entity;
+package com.trading.market.dataservice.entity;
 
 import java.math.BigDecimal;
 
