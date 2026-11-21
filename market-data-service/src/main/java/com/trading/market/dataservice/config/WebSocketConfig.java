@@ -7,37 +7,54 @@ import org.springframework.web.socket.config.annotation.StompEndpointRegistry;
 import org.springframework.web.socket.config.annotation.WebSocketMessageBrokerConfigurer;
 
 /**
+ * WebSocket (STOMP) configuration for streaming live stock prices.
+ * <p>
  * How it works:
- * 1. Client connects to /ws endpoint
- * 2. Client subscribes to /topic/prices/{symbol}
- * 3. Server publishes price updates to that topic
- * 4. Client receives updated in real time - no polling needed
- *
- * This is exactly how Zerodha/ Robinhood/ Groww stream real time prices
+ * <ol>
+ *   <li>Client connects to the {@code /ws} endpoint.</li>
+ *   <li>Client subscribes to {@code /topic/prices/{symbol}}.</li>
+ *   <li>Server publishes price updates to that topic.</li>
+ *   <li>Client receives updates in real time — no polling needed.</li>
+ * </ol>
+ * This is how trading platforms stream real-time prices.
  */
 @Configuration
 @EnableWebSocketMessageBroker
-public class WebSocketConfig implements WebSocketMessageBrokerConfigurer{
+public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
 
-	@Override
-	public void configureMessageBroker(MessageBrokerRegistry registry){
+    /**
+     * Configures the message broker and the application destination prefix.
+     * <p>
+     * Enables a simple in-memory broker on the {@code /topic} prefix (broadcast
+     * to all subscribers) and routes client messages sent to {@code /app/**}
+     * to {@code @MessageMapping} methods.
+     *
+     * @param registry the message broker registry. Cannot be null.
+     */
+    @Override
+    public void configureMessageBroker(MessageBrokerRegistry registry){
+        // Topics prefixed with /topic -> broadcast to all subscribers
+        registry.enableSimpleBroker("/topic");
 
-	    // Topics prefixed with /topic -> broadcast to all subscribers
-	    registry.enableSimpleBroker("/topic");
+        // Application destination prefix:
+        // client messages to /app/** are routed to @MessageMapping methods
+        registry.setApplicationDestinationPrefixes("/app");
+    }
 
-	    // Application destination prefix
-	    // Client messages to /app/** are routed to @MessageMapping methods
-	    registry.setApplicationDestinationPrefixes("/app");
-	}
-	
-	@Override
-	public void registerStompEndpoints(StompEndpointRegistry registry){
-
-	    // Websocket endpoint - clients connect here
-	    // SockJS fallback for browsers that don't support WebSocket
-
-	    registry.addEndpoint("/ws")
-	            .setAllowedOriginPatterns("*")
-	            .withSockJS();
-	}
+    /**
+     * Registers the STOMP endpoint clients connect to.
+     * <p>
+     * Exposes the {@code /ws} endpoint with SockJS fallback for browsers that
+     * do not support native WebSocket.
+     *
+     * @param registry the STOMP endpoint registry. Cannot be null.
+     */
+    @Override
+    public void registerStompEndpoints(StompEndpointRegistry registry){
+        // WebSocket endpoint - clients connect here
+        // SockJS fallback for browsers that don't support WebSocket
+        registry.addEndpoint("/ws")
+                .setAllowedOriginPatterns("*")
+                .withSockJS();
+    }
 }

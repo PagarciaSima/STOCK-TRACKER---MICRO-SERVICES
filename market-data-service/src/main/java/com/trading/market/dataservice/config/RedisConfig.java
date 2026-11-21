@@ -7,18 +7,27 @@ import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.data.redis.serializer.GenericJacksonJsonRedisSerializer;
 import org.springframework.data.redis.serializer.StringRedisSerializer;
 
+/**
+ * Configuration for the Redis template used to cache stock prices.
+ */
 @Configuration
 public class RedisConfig {
 
+    /**
+     * Creates a {@link RedisTemplate} with String keys and JSON values.
+     *
+     * @param connectionFactory the Redis connection factory. Cannot be null.
+     * @return a configured {@link RedisTemplate}. Never null.
+     */
     @Bean
-    RedisTemplate<String, Object> redisTemplate(
+    public RedisTemplate<String, Object> redisTemplate(
             RedisConnectionFactory connectionFactory){
 
         RedisTemplate<String, Object> template = new RedisTemplate<>();
         template.setConnectionFactory(connectionFactory);
         template.setKeySerializer(new StringRedisSerializer());
-        
-        // Usamos el Builder para crear el serializador
+
+        // Use the builder to create the serializer
         template.setValueSerializer(
                 GenericJacksonJsonRedisSerializer.builder().build());
 

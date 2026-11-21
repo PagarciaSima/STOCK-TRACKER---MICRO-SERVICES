@@ -204,6 +204,11 @@ public class UserService {
                 .compact();
     }
 
+    /**
+     * Builds the signing key used to sign and verify JWT tokens.
+     *
+     * @return a {@link SecretKey} derived from the configured JWT secret. Never null.
+     */
     private SecretKey getSignInKey() {
         byte[] keyBytes = Decoders.BASE64.decode(secret);
         return Keys.hmacShaKeyFor(keyBytes);
@@ -284,6 +289,14 @@ public class UserService {
         return new FundsOperationResponse(savedUser.getId(), savedUser.getWalletBalance(), true);
     }
 
+    /**
+     * Builds an {@link AuthResponse} from a user entity and JWT tokens.
+     *
+     * @param user        the authenticated user. Cannot be null.
+     * @param token       the access token. Cannot be null or blank.
+     * @param refreshToken the refresh token. Cannot be null or blank.
+     * @return a populated {@link AuthResponse} with tokens and user data.
+     */
     private AuthResponse buildAuthResponse(User user, String token, String refreshToken) {
         AuthResponse response = new AuthResponse();
         response.setAccessToken(token);
@@ -297,6 +310,12 @@ public class UserService {
         return response;
     }
 
+    /**
+     * Maps a {@link User} entity to a {@link UserResponse} DTO.
+     *
+     * @param user the user entity. Cannot be null.
+     * @return a {@link UserResponse} with the user's public data.
+     */
     private UserResponse mapToResponse(User user) {
         UserResponse response = new UserResponse();
         response.setId(user.getId());

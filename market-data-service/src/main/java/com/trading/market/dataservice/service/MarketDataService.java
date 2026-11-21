@@ -12,6 +12,7 @@ import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.scheduling.annotation.Scheduled;
+import org.springframework.stereotype.Service;
 
 import com.trading.market.dataservice.dto.PriceUpdatedEvent;
 import com.trading.market.dataservice.dto.StockPrice;
@@ -22,6 +23,12 @@ import jakarta.annotation.PostConstruct;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 
+/**
+ * Core service for market data: loads stocks, simulates live price movements,
+ * caches the latest price in Redis, broadcasts updates over WebSocket and
+ * publishes price-update events to Kafka.
+ */
+@Service
 @Slf4j
 @RequiredArgsConstructor
 public class MarketDataService {
@@ -43,9 +50,10 @@ public class MarketDataService {
 
 
     /**
-     * Initialize Stock prices
-     * 
-     * @PostConstruct -> runs when context is ready
+     * Loads all active stocks from the database into the in-memory price map.
+     * <p>
+     * Runs once after the application context is ready ({@code @PostConstruct}).
+     * If no active stocks exist, logs a warning and returns without initializing.
      */
     @PostConstruct
     public void initializePrices(){
@@ -83,6 +91,14 @@ public class MarketDataService {
                 stockPrices.size());
     }
     
+    /**
+     * Simulates a price movement for every loaded stock on a fixed schedule.
+     * <p>
+     * For each stock, computes a random price delta, updates high/low/change
+     * metrics, caches the new price in Redis, broadcasts it over the
+     * {@code /topic/prices/{symbol}} WebSocket topic and publishes a
+     * {@link PriceUpdatedEvent} to Kafka.
+     */
     @Scheduled(fixedRateString = "${market.price-update-interval}")
     public void updatePrices(){
 
@@ -160,7 +176,12 @@ public class MarketDataService {
     }
     
     /**
-     * Get current price from Redis
+     * Returns the latest price for a symbol, reading from Redis first and
+     * falling back to the in-memory map.
+     *
+     * @param symbol the stock ticker symbol. Cannot be null or blank.
+     * @return the current {@link StockPrice}. Never null.
+     * @throws RuntimeException if the symbol is not cached nor loaded in memory.
      */
     public StockPrice getPrice(String symbol){
         Object cached = redisTemplate.opsForValue()
@@ -182,15 +203,18 @@ public class MarketDataService {
     }
     
     /**
-     * Get all active stock prices
-     * @return
+     * Returns the current prices of all loaded stocks.
+     *
+     * @return an immutable list of {@link StockPrice} (possibly empty). Never null.
      */
     public List<StockPrice> getAllPrices(){
         return stockPrices.values().stream().toList();
     }
     
     /**
-     * Get all stocks
+     * Returns all active stocks available for trading.
+     *
+     * @return a list of active {@link Stock} entities (possibly empty). Never null.
      */
     public List<Stock> getAllStocks(){
         return stockRepository.findByActiveTrue();
