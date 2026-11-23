@@ -4,6 +4,7 @@ package com.trading.user.service.service;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.Date;
+import java.util.List;
 
 import javax.crypto.SecretKey;
 
@@ -18,6 +19,7 @@ import com.trading.user.service.dto.LoginRequest;
 import com.trading.user.service.dto.RegisterRequest;
 import com.trading.user.service.dto.UserRegisteredEvent;
 import com.trading.user.service.dto.UserResponse;
+import com.trading.user.service.entity.Role;
 import com.trading.user.service.entity.User;
 import com.trading.user.service.repository.UserRepository;
 
@@ -74,7 +76,7 @@ public class UserService {
 
         publishUserRegisteredEvent(savedUser);
 
-        String[] tokens = generateTokens(savedUser.getId(), savedUser.getEmail());
+        String[] tokens = generateTokens(savedUser.getId(), savedUser.getEmail(), resolveRole(savedUser));
         return buildAuthResponse(savedUser, tokens[0], tokens[1]);
     }
 
@@ -108,6 +110,7 @@ public class UserService {
                         // initial fictitious balance
                         : BigDecimal.valueOf(10000)
         );
+        user.setRole(Role.USER);
         return user;
     }
 
@@ -133,11 +136,12 @@ public class UserService {
      *
      * @param userId  the identifier of the user. Cannot be null or blank.
      * @param email   the email of the user (used as JWT subject). Cannot be null or blank.
+     * @param role    the authorization role of the user. Cannot be null.
      * @return an array where [0] is the access token and [1] is the refresh token.
      */
-    private String[] generateTokens(String userId, String email) {
-        String accessToken = generateAccessToken(userId, email);
-        String refreshToken = generateRefreshToken(userId);
+    private String[] generateTokens(String userId, String email, Role role) {
+        String accessToken = generateAccessToken(userId, email, role);
+        String refreshToken = generateRefreshToken(userId, role);
         return new String[]{accessToken, refreshToken};
     }
 
@@ -158,7 +162,7 @@ public class UserService {
             throw new RuntimeException("Invalid password for " + request.getEmail());
         }
 
-        String[] tokens = generateTokens(user.getId(), user.getEmail());
+        String[] tokens = generateTokens(user.getId(), user.getEmail(), resolveRole(user));
         return buildAuthResponse(user, tokens[0], tokens[1]);
     }
 
@@ -169,14 +173,16 @@ public class UserService {
      *                Cannot be null or blank.
      * @param email   the email of the user (used as JWT subject).
      *                Cannot be null or blank.
+     * @param role    the authorization role (stored in the "role" claim). Cannot be null.
      * @return the signed access token string.
      */
-    private String generateAccessToken(String userId, String email) {
+    private String generateAccessToken(String userId, String email, Role role) {
         Instant now = Instant.now();
         Instant expiry = now.plusMillis(jwtExpiration);
 
         return Jwts.builder()
                 .claim("userId", userId)
+                .claim("role", role.name())
                 .subject(email)
                 .issuedAt(Date.from(now))
                 .expiration(Date.from(expiry))
@@ -189,14 +195,16 @@ public class UserService {
      *
      * @param userId the identifier of the user (stored in the "userId" claim and subject).
      *               Cannot be null or blank.
+     * @param role   the authorization role (stored in the "role" claim). Cannot be null.
      * @return the signed refresh token string.
      */
-    private String generateRefreshToken(String userId) {
+    private String generateRefreshToken(String userId, Role role) {
         Instant now = Instant.now();
         Instant expiry = now.plusMillis(refreshExpiration);
 
         return Jwts.builder()
                 .claim("userId", userId)
+                .claim("role", role.name())
                 .subject(userId)
                 .issuedAt(Date.from(now))
                 .expiration(Date.from(expiry))
@@ -218,7 +226,7 @@ public class UserService {
      * Get user by identifier. Called by other services via Feign (internal).
      *
      * @param userId the identifier of the user. Cannot be null or blank.
-     * @return the mapped
+     * @return the mapped {@link UserResponse} for the user.
      * @throws RuntimeException if the user is not found.
      */
     public UserResponse getUserById(String userId) {
@@ -227,7 +235,7 @@ public class UserService {
 
         return mapToResponse(user);
     }
-
+    
     /**
      * Add funds to a user's wallet.
      *
@@ -290,6 +298,28 @@ public class UserService {
     }
 
     /**
+     * Returns all registered users. Intended for administrative use only.
+     *
+     * @return the list of all users mapped to {@link UserResponse} (possibly empty). Never null.
+     */
+    public List<UserResponse> getAllUsers() {
+        return userRepository.findAll().stream()
+                .map(this::mapToResponse)
+                .toList();
+    }
+
+    /**
+     * Resolves the effective role of a user, defaulting to {@code USER} when the
+     * stored role is null (e.g. legacy rows created before roles were introduced).
+     *
+     * @param user the user entity. Cannot be null.
+     * @return the effective {@link Role}. Never null.
+     */
+    private Role resolveRole(User user) {
+        return user.getRole() != null ? user.getRole() : Role.USER;
+    }
+
+    /**
      * Builds an {@link AuthResponse} from a user entity and JWT tokens.
      *
      * @param user        the authenticated user. Cannot be null.
@@ -306,6 +336,7 @@ public class UserService {
         response.setLastName(user.getLastName());
         response.setRefreshToken(refreshToken);
         response.setWalletBalance(user.getWalletBalance());
+        response.setRole(resolveRole(user));
 
         return response;
     }
@@ -324,6 +355,7 @@ public class UserService {
         response.setLastName(user.getLastName());
         response.setWalletBalance(user.getWalletBalance());
         response.setStatus(user.getStatus());
+        response.setRole(resolveRole(user));
         response.setCreatedAt(user.getCreatedAt());
 
         return response;

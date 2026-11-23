@@ -14,6 +14,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 import com.trading.orderservice.dto.OrderRequest;
 import com.trading.orderservice.entity.Order;
+import com.trading.orderservice.security.AuthorizationGuard;
 import com.trading.orderservice.service.OrderService;
 
 import jakarta.validation.Valid;
@@ -23,8 +24,8 @@ import lombok.extern.slf4j.Slf4j;
 /**
  * REST controller for placing and querying orders.
  * <p>
- * The authenticated user id is received from the API gateway through the
- * {@code X-User-Id} header.
+ * The authenticated user id and role are received from the API gateway through
+ * the {@code X-User-Id} and {@code X-User-Role} headers.
  */
 @RestController
 @RequestMapping("/api/v1/orders")
@@ -33,6 +34,7 @@ import lombok.extern.slf4j.Slf4j;
 public class OrderController {
 
     private final OrderService orderService;
+    private final AuthorizationGuard authorizationGuard;
 
     /**
      * Places a BUY or SELL order for the authenticated user.
@@ -57,26 +59,24 @@ public class OrderController {
     }
 
     /**
-     * Retrieves a single order by id, enforcing ownership.
+     * Retrieves a single order by id. Admins can read any order; a standard user
+     * can only read their own orders.
      *
      * @param orderId the unique identifier of the order. Cannot be null or blank.
      * @param userId  the authenticated user id (from the gateway). Cannot be null or blank.
-     * @return {@code 200 OK} with the order if it belongs to the user;
-     *         {@code 403 Forbidden} if the order belongs to another user.
+     * @param role    the authenticated user's role (from the gateway). Cannot be null.
+     * @return {@code 200 OK} with the order.
+     * @throws com.trading.orderservice.exception.AccessDeniedException if the caller is not an admin nor the owner.
      */
     @GetMapping("/{orderId}")
     public ResponseEntity<Order> getOrder(
             @PathVariable String orderId,
-            @RequestHeader("X-User-Id") String userId){
+            @RequestHeader("X-User-Id") String userId,
+            @RequestHeader("X-User-Role") String role){
 
         log.debug("Fetching order: {} for user: {}", orderId, userId);
         Order order = orderService.getOrder(orderId);
-
-        // Security check: only the owner can read the order
-        if (!order.getUserId().equals(userId)) {
-            log.warn("User {} attempted to access order {} owned by {}", userId, orderId, order.getUserId());
-            return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
-        }
+        authorizationGuard.requireOwnerOrAdmin(userId, role, order.getUserId());
 
         return ResponseEntity.ok(order);
     }
@@ -94,5 +94,23 @@ public class OrderController {
         log.debug("Fetching orders for user: {}", userId);
         return ResponseEntity.ok(
                 orderService.getMyOrders(userId));
+    }
+
+    /**
+     * Retrieves all orders of an arbitrary user. Admin-only endpoint.
+     *
+     * @param userId the identifier of the target user. Cannot be null or blank.
+     * @param role   the authenticated user's role (from the gateway). Cannot be null.
+     * @return {@code 200 OK} with the list of orders for the target user.
+     * @throws com.trading.orderservice.exception.AccessDeniedException if the caller is not an admin.
+     */
+    @GetMapping("/user/{userId}")
+    public ResponseEntity<List<Order>> getUserOrders(
+            @PathVariable String userId,
+            @RequestHeader("X-User-Role") String role){
+
+        authorizationGuard.requireAdmin(role);
+        return ResponseEntity.ok(
+                orderService.getUserOrders(userId));
     }
 }

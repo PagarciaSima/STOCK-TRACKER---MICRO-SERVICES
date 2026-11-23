@@ -56,6 +56,11 @@ public class User {
     @Enumerated(EnumType.STRING)
     private UserStatus status = UserStatus.ACTIVE;
 
+    /** Authorization role of the user (ADMIN or USER). Defaults to USER. */
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false)
+    private Role role = Role.USER;
+
     /** Timestamp when the user was created. */
     @CreationTimestamp
     private LocalDateTime createdAt;

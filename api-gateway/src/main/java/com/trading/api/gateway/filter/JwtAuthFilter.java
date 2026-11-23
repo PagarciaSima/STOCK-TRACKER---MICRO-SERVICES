@@ -18,6 +18,8 @@ import io.jsonwebtoken.security.Keys;
 import lombok.extern.slf4j.Slf4j;
 import reactor.core.publisher.Mono;
 
+import com.trading.api.gateway.security.Role;
+
 /**
  * Gateway filter that validates JWT tokens and propagates the authenticated
  * user identity to downstream services.
@@ -82,12 +84,14 @@ public class JwtAuthFilter extends AbstractGatewayFilterFactory<JwtAuthFilter.Co
 
                 String userId = claims.get("userId", String.class);
                 String email = claims.getSubject();
+                Role role = Role.from(claims.get("role", String.class));
 
-                log.debug("Authenticated request - userId: {} email: {}", userId, email);
+                log.debug("Authenticated request - userId: {} email: {} role: {}", userId, email, role);
 
                 ServerHttpRequest modifiedRequest = request
                         .mutate()
                         .header("X-User-Id", userId)
+                        .header("X-User-Role", role.name())
                         .build();
                 return chain.filter(
                         exchange.mutate()

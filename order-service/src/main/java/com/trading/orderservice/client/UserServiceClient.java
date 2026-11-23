@@ -22,7 +22,7 @@ public interface UserServiceClient {
      * @param amount the amount to deduct. Cannot be null or negative.
      * @return a {@link FundsOperationResponse} with the new balance.
      */
-    @PostMapping("/api/v1/users/{userId}/funds/deduct")
+    @PostMapping("/api/v1/users/internal/{userId}/funds/deduct")
     FundsOperationResponse deductFunds(
             @PathVariable String userId,
             @RequestParam BigDecimal amount);
@@ -34,7 +34,7 @@ public interface UserServiceClient {
      * @param amount the amount to credit. Cannot be null or negative.
      * @return a {@link FundsOperationResponse} with the new balance.
      */
-    @PostMapping("/api/v1/users/{userId}/funds/credit")
+    @PostMapping("/api/v1/users/internal/{userId}/funds/credit")
     FundsOperationResponse creditFunds(
             @PathVariable String userId,
             @RequestParam BigDecimal amount);

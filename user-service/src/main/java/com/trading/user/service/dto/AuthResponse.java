@@ -1,9 +1,12 @@
 package com.trading.user.service.dto;
 
+import java.math.BigDecimal;
+
+import com.trading.user.service.entity.Role;
+
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
-import java.math.BigDecimal;
 
 /**
  * Authentication response returned after register or login, containing the
@@ -28,6 +31,9 @@ public class AuthResponse {
 
     /** Current wallet balance. */
     private BigDecimal walletBalance;
+
+    /** Authorization role of the authenticated user. */
+    private Role role;
 
     /** Signed JWT access token. */
     private String accessToken;

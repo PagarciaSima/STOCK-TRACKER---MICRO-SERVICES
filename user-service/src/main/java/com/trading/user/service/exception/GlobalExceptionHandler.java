@@ -42,6 +42,22 @@ public class GlobalExceptionHandler {
     }
 
     /**
+     * Handles authorization failures, returning {@code 403 Forbidden}.
+     *
+     * @param ex the access denied exception. Cannot be null.
+     * @return a {@code 403 Forbidden} response with an {@link ApiError} body.
+     */
+    @ExceptionHandler(AccessDeniedException.class)
+    public ResponseEntity<ApiError> handleAccessDenied(AccessDeniedException ex) {
+        ApiError apiError = new ApiError(
+                HttpStatus.FORBIDDEN.value(),
+                "Forbidden",
+                ex.getMessage(),
+                null);
+        return ResponseEntity.status(HttpStatus.FORBIDDEN).body(apiError);
+    }
+
+    /**
      * Handles constraint violations (e.g. on path variables or request parameters).
      *
      * @param ex the constraint violation exception. Cannot be null.

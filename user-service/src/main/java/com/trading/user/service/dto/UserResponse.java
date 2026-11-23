@@ -3,6 +3,7 @@ package com.trading.user.service.dto;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
+import com.trading.user.service.entity.Role;
 import com.trading.user.service.entity.UserStatus;
 
 import lombok.AllArgsConstructor;
@@ -34,6 +35,9 @@ public class UserResponse {
 
     /** Account status. */
     private UserStatus status;
+
+    /** Authorization role of the user. */
+    private Role role;
 
     /** Timestamp when the user was created. */
     private LocalDateTime createdAt;
