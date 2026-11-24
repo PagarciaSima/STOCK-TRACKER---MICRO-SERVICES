@@ -57,11 +57,66 @@ spring:
           filters:
             - name: JwtAuthFilter
 
+        # OPENAPI AGGREGATION (public)
+        - id: openapi-users
+          uri: http://localhost:8081
+          predicates:
+            - Path=/v3/api-docs/users
+          filters:
+            - RewritePath=/v3/api-docs/users, /v3/api-docs
+
+        - id: openapi-market-data
+          uri: http://localhost:8082
+          predicates:
+            - Path=/v3/api-docs/market-data
+          filters:
+            - RewritePath=/v3/api-docs/market-data, /v3/api-docs
+
+        - id: openapi-orders
+          uri: http://localhost:8083
+          predicates:
+            - Path=/v3/api-docs/orders
+          filters:
+            - RewritePath=/v3/api-docs/orders, /v3/api-docs
+
+        - id: openapi-portfolio
+          uri: http://localhost:8084
+          predicates:
+            - Path=/v3/api-docs/portfolio
+          filters:
+            - RewritePath=/v3/api-docs/portfolio, /v3/api-docs
+
+        - id: openapi-notifications
+          uri: http://localhost:8085
+          predicates:
+            - Path=/v3/api-docs/notifications
+          filters:
+            - RewritePath=/v3/api-docs/notifications, /v3/api-docs
+
 server:
   port: 8080
 
 jwt:
   secret: qNiwobQFrXWDou6EIWAhman5n771RqZlCltkMgbYptc=
+
+springdoc:
+  api-docs:
+    enabled: true
+    path: /v3/api-docs
+  swagger-ui:
+    path: /swagger-ui.html
+    disable-swagger-default-url: true
+    urls:
+      - name: Users
+        url: /v3/api-docs/users
+      - name: Market Data
+        url: /v3/api-docs/market-data
+      - name: Orders
+        url: /v3/api-docs/orders
+      - name: Portfolio
+        url: /v3/api-docs/portfolio
+      - name: Notifications
+        url: /v3/api-docs/notifications
 
 management:
   endpoints:

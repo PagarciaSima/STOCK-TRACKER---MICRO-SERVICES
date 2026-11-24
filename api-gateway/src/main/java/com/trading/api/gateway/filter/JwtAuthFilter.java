@@ -146,14 +146,17 @@ public class JwtAuthFilter extends AbstractGatewayFilterFactory<JwtAuthFilter.Co
      * Checks whether a request path is public and should bypass JWT validation.
      *
      * @param path the request path. Cannot be null.
-     * @return {@code true} if the path is public (register, login, health, websocket),
+     * @return {@code true} if the path is public (register, login, health, websocket, swagger),
      *         {@code false} otherwise.
      */
     private boolean isPublicEndpoint(String path) {
         return path.contains("/register")
                 || path.contains("/login")
                 || path.contains("/health")
-                || path.contains("/ws");
+                || path.contains("/ws")
+                || path.contains("/swagger-ui")
+                || path.contains("/v3/api-docs")
+                || path.contains("/webjars/");
     }
 
     /**

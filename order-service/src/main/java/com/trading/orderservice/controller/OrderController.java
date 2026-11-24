@@ -17,6 +17,11 @@ import com.trading.orderservice.entity.Order;
 import com.trading.orderservice.security.AuthorizationGuard;
 import com.trading.orderservice.service.OrderService;
 
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import io.swagger.v3.oas.annotations.responses.ApiResponses;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -27,6 +32,7 @@ import lombok.extern.slf4j.Slf4j;
  * The authenticated user id and role are received from the API gateway through
  * the {@code X-User-Id} and {@code X-User-Role} headers.
  */
+@Tag(name = "Orders", description = "Place and query BUY/SELL stock orders")
 @RestController
 @RequestMapping("/api/v1/orders")
 @Slf4j
@@ -38,22 +44,25 @@ public class OrderController {
 
     /**
      * Places a BUY or SELL order for the authenticated user.
-     * <p>
-     * The {@code userId} from the request body is overridden with the
-     * authenticated user id from the {@code X-User-Id} header to prevent
-     * clients from impersonating other users.
      *
      * @param userId  the authenticated user id (from the gateway). Cannot be null or blank.
      * @param request the order request. Must be valid (symbol not blank, type not null, quantity &gt;= 1).
      * @return {@code 201 Created} with the created order.
      */
+    @Operation(summary = "Place a buy or sell order",
+            description = "Creates a BUY/SELL order for the authenticated user and publishes a Kafka event.")
+    @ApiResponses({
+            @ApiResponse(responseCode = "201", description = "Order created"),
+            @ApiResponse(responseCode = "400", description = "Invalid order request")
+    })
     @PostMapping
     public ResponseEntity<Order> placeOrder(
+            @Parameter(description = "Authenticated user id injected by the gateway", required = true)
             @RequestHeader("X-User-Id") String userId,
             @Valid @RequestBody OrderRequest request){
 
         log.info("Received place order request for user: {} symbol: {}", userId, request.getSymbol());
-        request.setUserId(userId); // override with authenticated user id
+        request.setUserId(userId);
         return ResponseEntity.status(HttpStatus.CREATED)
                 .body(orderService.placeOrder(request));
     }
@@ -66,12 +75,20 @@ public class OrderController {
      * @param userId  the authenticated user id (from the gateway). Cannot be null or blank.
      * @param role    the authenticated user's role (from the gateway). Cannot be null.
      * @return {@code 200 OK} with the order.
-     * @throws com.trading.orderservice.exception.AccessDeniedException if the caller is not an admin nor the owner.
      */
+    @Operation(summary = "Get an order by id",
+            description = "Returns an order. Admins can read any order; users only their own.")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Order found"),
+            @ApiResponse(responseCode = "403", description = "Access denied"),
+            @ApiResponse(responseCode = "404", description = "Order not found")
+    })
     @GetMapping("/{orderId}")
     public ResponseEntity<Order> getOrder(
-            @PathVariable String orderId,
+            @Parameter(description = "Order identifier", required = true) @PathVariable String orderId,
+            @Parameter(description = "Authenticated user id injected by the gateway", required = true)
             @RequestHeader("X-User-Id") String userId,
+            @Parameter(description = "Authenticated user role injected by the gateway", required = true)
             @RequestHeader("X-User-Role") String role){
 
         log.debug("Fetching order: {} for user: {}", orderId, userId);
@@ -87,8 +104,12 @@ public class OrderController {
      * @param userId the authenticated user id (from the gateway). Cannot be null or blank.
      * @return {@code 200 OK} with the list of orders for the user.
      */
+    @Operation(summary = "List my orders",
+            description = "Returns all orders of the authenticated user, newest first.")
+    @ApiResponse(responseCode = "200", description = "Orders returned")
     @GetMapping("/my-orders")
     public ResponseEntity<List<Order>> getMyOrders(
+            @Parameter(description = "Authenticated user id injected by the gateway", required = true)
             @RequestHeader("X-User-Id") String userId){
 
         log.debug("Fetching orders for user: {}", userId);
@@ -102,11 +123,17 @@ public class OrderController {
      * @param userId the identifier of the target user. Cannot be null or blank.
      * @param role   the authenticated user's role (from the gateway). Cannot be null.
      * @return {@code 200 OK} with the list of orders for the target user.
-     * @throws com.trading.orderservice.exception.AccessDeniedException if the caller is not an admin.
      */
+    @Operation(summary = "List orders of a user (admin)",
+            description = "Returns all orders of any user. Requires ADMIN role.")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Orders returned"),
+            @ApiResponse(responseCode = "403", description = "Admin privileges required")
+    })
     @GetMapping("/user/{userId}")
     public ResponseEntity<List<Order>> getUserOrders(
-            @PathVariable String userId,
+            @Parameter(description = "Target user identifier", required = true) @PathVariable String userId,
+            @Parameter(description = "Authenticated user role injected by the gateway", required = true)
             @RequestHeader("X-User-Role") String role){
 
         authorizationGuard.requireAdmin(role);

@@ -1,0 +1,196 @@
+{
+  "info": {
+    "name": "Stock Trading Platform API",
+    "_postman_id": "b1a2c3d4-0000-4000-8000-000000000001",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "description": "Postman collection for the Stock Trading Platform microservices, called through the API Gateway (http://localhost:8080). Register/Login first to populate {{token}} and {{userId}}."
+  },
+  "variable": [
+    { "key": "base_url", "value": "http://localhost:8080" },
+    { "key": "token", "value": "" },
+    { "key": "userId", "value": "" },
+    { "key": "orderId", "value": "" },
+    { "key": "symbol", "value": "AAPL" }
+  ],
+  "auth": {
+    "type": "bearer",
+    "bearer": [ { "key": "token", "value": "{{token}}", "type": "string" } ]
+  },
+  "item": [
+    {
+      "name": "Users",
+      "item": [
+        {
+          "name": "Register",
+          "request": {
+            "method": "POST",
+            "header": [ { "key": "Content-Type", "value": "application/json" } ],
+            "auth": { "type": "noauth" },
+            "body": { "mode": "raw", "raw": "{\n  \"email\": \"user@example.com\",\n  \"password\": \"password123\",\n  \"firstName\": \"John\",\n  \"lastName\": \"Doe\",\n  \"initialDeposit\": 10000\n}", "options": { "raw": { "language": "json" } } },
+            "url": { "raw": "{{base_url}}/api/v1/users/register", "host": ["{{base_url}}"], "path": ["api","v1","users","register"] }
+          }
+        },
+        {
+          "name": "Login",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const data = pm.response.json();",
+                  "if (data.accessToken) { pm.collectionVariables.set('token', data.accessToken); }",
+                  "if (data.userId) { pm.collectionVariables.set('userId', data.userId); }"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [ { "key": "Content-Type", "value": "application/json" } ],
+            "auth": { "type": "noauth" },
+            "body": { "mode": "raw", "raw": "{\n  \"email\": \"user@example.com\",\n  \"password\": \"password123\"\n}", "options": { "raw": { "language": "json" } } },
+            "url": { "raw": "{{base_url}}/api/v1/users/login", "host": ["{{base_url}}"], "path": ["api","v1","users","login"] }
+          }
+        },
+        {
+          "name": "Get my profile",
+          "request": { "method": "GET", "header": [], "url": { "raw": "{{base_url}}/api/v1/users/me", "host": ["{{base_url}}"], "path": ["api","v1","users","me"] } }
+        },
+        {
+          "name": "List all users (admin)",
+          "request": { "method": "GET", "header": [], "url": { "raw": "{{base_url}}/api/v1/users/all", "host": ["{{base_url}}"], "path": ["api","v1","users","all"] } }
+        },
+        {
+          "name": "Get user by id",
+          "request": { "method": "GET", "header": [], "url": { "raw": "{{base_url}}/api/v1/users/{{userId}}", "host": ["{{base_url}}"], "path": ["api","v1","users","{{userId}}"] } }
+        },
+        {
+          "name": "Add funds",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/v1/users/{{userId}}/funds/add?amount=1000",
+              "host": ["{{base_url}}"],
+              "path": ["api","v1","users","{{userId}}","funds","add"],
+              "query": [ { "key": "amount", "value": "1000" } ]
+            }
+          }
+        },
+        {
+          "name": "Deduct funds",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/v1/users/{{userId}}/funds/deduct?amount=100",
+              "host": ["{{base_url}}"],
+              "path": ["api","v1","users","{{userId}}","funds","deduct"],
+              "query": [ { "key": "amount", "value": "100" } ]
+            }
+          }
+        },
+        {
+          "name": "Credit funds",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/v1/users/{{userId}}/funds/credit?amount=100",
+              "host": ["{{base_url}}"],
+              "path": ["api","v1","users","{{userId}}","funds","credit"],
+              "query": [ { "key": "amount", "value": "100" } ]
+            }
+          }
+        }
+      ]
+    }
+,
+    {
+      "name": "Orders",
+      "item": [
+        {
+          "name": "Place order",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const data = pm.response.json();",
+                  "if (data.id) { pm.collectionVariables.set('orderId', data.id); }"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [ { "key": "Content-Type", "value": "application/json" } ],
+            "body": { "mode": "raw", "raw": "{\n  \"symbol\": \"{{symbol}}\",\n  \"type\": \"BUY\",\n  \"quantity\": 10\n}", "options": { "raw": { "language": "json" } } },
+            "url": { "raw": "{{base_url}}/api/v1/orders", "host": ["{{base_url}}"], "path": ["api","v1","orders"] }
+          }
+        },
+        {
+          "name": "Get order by id",
+          "request": { "method": "GET", "header": [], "url": { "raw": "{{base_url}}/api/v1/orders/{{orderId}}", "host": ["{{base_url}}"], "path": ["api","v1","orders","{{orderId}}"] } }
+        },
+        {
+          "name": "My orders",
+          "request": { "method": "GET", "header": [], "url": { "raw": "{{base_url}}/api/v1/orders/my-orders", "host": ["{{base_url}}"], "path": ["api","v1","orders","my-orders"] } }
+        },
+        {
+          "name": "User orders (admin)",
+          "request": { "method": "GET", "header": [], "url": { "raw": "{{base_url}}/api/v1/orders/user/{{userId}}", "host": ["{{base_url}}"], "path": ["api","v1","orders","user","{{userId}}"] } }
+        }
+      ]
+    }
+,
+    {
+      "name": "Portfolio",
+      "item": [
+        {
+          "name": "My portfolio",
+          "request": { "method": "GET", "header": [], "url": { "raw": "{{base_url}}/api/v1/portfolio/me", "host": ["{{base_url}}"], "path": ["api","v1","portfolio","me"] } }
+        },
+        {
+          "name": "User portfolio",
+          "request": { "method": "GET", "header": [], "url": { "raw": "{{base_url}}/api/v1/portfolio/{{userId}}", "host": ["{{base_url}}"], "path": ["api","v1","portfolio","{{userId}}"] } }
+        }
+      ]
+    }
+,
+    {
+      "name": "Market Data",
+      "item": [
+        {
+          "name": "All current prices",
+          "request": { "method": "GET", "header": [], "url": { "raw": "{{base_url}}/api/v1/market/stocks", "host": ["{{base_url}}"], "path": ["api","v1","market","stocks"] } }
+        },
+        {
+          "name": "Price by symbol",
+          "request": { "method": "GET", "header": [], "url": { "raw": "{{base_url}}/api/v1/market/stocks/{{symbol}}", "host": ["{{base_url}}"], "path": ["api","v1","market","stocks","{{symbol}}"] } }
+        },
+        {
+          "name": "Tradeable stocks",
+          "request": { "method": "GET", "header": [], "url": { "raw": "{{base_url}}/api/v1/market/stocks/list", "host": ["{{base_url}}"], "path": ["api","v1","market","stocks","list"] } }
+        }
+      ]
+    }
+,
+    {
+      "name": "Notifications",
+      "item": [
+        {
+          "name": "Send test notification",
+          "request": {
+            "method": "POST",
+            "header": [ { "key": "Content-Type", "value": "application/json" } ],
+            "body": { "mode": "raw", "raw": "{\n  \"title\": \"Test\",\n  \"message\": \"Hello from Postman\"\n}", "options": { "raw": { "language": "json" } } },
+            "url": { "raw": "{{base_url}}/api/v1/notifications/test", "host": ["{{base_url}}"], "path": ["api","v1","notifications","test"] }
+          }
+        }
+      ]
+    }
+  ]
+}

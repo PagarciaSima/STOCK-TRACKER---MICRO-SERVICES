@@ -12,6 +12,11 @@ import com.trading.market.dataservice.dto.StockPrice;
 import com.trading.market.dataservice.entity.Stock;
 import com.trading.market.dataservice.service.MarketDataService;
 
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import io.swagger.v3.oas.annotations.responses.ApiResponses;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 
@@ -19,6 +24,7 @@ import lombok.extern.slf4j.Slf4j;
  * REST controller exposing market-data queries: current stock prices and the
  * list of tradeable stocks.
  */
+@Tag(name = "Market Data", description = "Stock prices and tradeable instruments")
 @RestController
 @RequestMapping("/api/v1/market")
 @Slf4j
@@ -32,6 +38,8 @@ public class MarketDataController {
      *
      * @return {@code 200 OK} with the list of current {@link StockPrice} entries.
      */
+    @Operation(summary = "Get all current prices", description = "Returns all stocks with their current prices.")
+    @ApiResponse(responseCode = "200", description = "Prices returned")
     @GetMapping("/stocks")
     public ResponseEntity<List<StockPrice>> getAllStocks(){
         log.debug("Fetching all current stock prices");
@@ -45,9 +53,14 @@ public class MarketDataController {
      * @param symbol the stock ticker symbol. Cannot be null or blank.
      * @return {@code 200 OK} with the current {@link StockPrice} for the symbol.
      */
+    @Operation(summary = "Get price by symbol", description = "Returns the current price for a given stock symbol.")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Price returned"),
+            @ApiResponse(responseCode = "404", description = "Stock not found")
+    })
     @GetMapping("/stocks/{symbol}")
     public ResponseEntity<StockPrice> getStockPrice(
-            @PathVariable String symbol) {
+            @Parameter(description = "Stock ticker symbol", required = true) @PathVariable String symbol) {
         log.debug("Fetching price for symbol: {}", symbol);
         return ResponseEntity.ok(
                 marketDataService.getPrice(
@@ -59,6 +72,8 @@ public class MarketDataController {
      *
      * @return {@code 200 OK} with the list of active {@link Stock} entities.
      */
+    @Operation(summary = "List tradeable stocks", description = "Returns all stocks available for trading.")
+    @ApiResponse(responseCode = "200", description = "Stocks returned")
     @GetMapping("/stocks/list")
     public ResponseEntity<List<Stock>> getStockList(){
         log.debug("Fetching list of tradeable stocks");

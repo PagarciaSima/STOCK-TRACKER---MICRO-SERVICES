@@ -11,6 +11,11 @@ import com.trading.portfolioservice.dto.PortfolioResponse;
 import com.trading.portfolioservice.security.AuthorizationGuard;
 import com.trading.portfolioservice.service.PortfolioService;
 
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import io.swagger.v3.oas.annotations.responses.ApiResponses;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 
 /**
@@ -19,6 +24,7 @@ import lombok.RequiredArgsConstructor;
  * The authenticated user id and role are received from the API gateway through
  * the {@code X-User-Id} and {@code X-User-Role} headers.
  */
+@Tag(name = "Portfolio", description = "User holdings and live profit & loss")
 @RestController
 @RequestMapping("/api/v1/portfolio")
 @RequiredArgsConstructor
@@ -33,8 +39,11 @@ public class PortfolioController {
      * @param userId the authenticated user id (from the gateway). Cannot be null or blank.
      * @return {@code 200 OK} with the user's {@link PortfolioResponse}.
      */
+    @Operation(summary = "Get my portfolio", description = "Returns the authenticated user's portfolio with live P&L.")
+    @ApiResponse(responseCode = "200", description = "Portfolio returned")
     @GetMapping("/me")
     public ResponseEntity<PortfolioResponse> getMyPortfolio(
+            @Parameter(description = "Authenticated user id injected by the gateway", required = true)
             @RequestHeader("X-User-Id") String userId) {
 
         return ResponseEntity.ok(
@@ -49,12 +58,19 @@ public class PortfolioController {
      * @param requesterId the authenticated user id (from the gateway). Cannot be null or blank.
      * @param role the authenticated user's role (from the gateway). Cannot be null.
      * @return {@code 200 OK} with the target user's {@link PortfolioResponse}.
-     * @throws com.trading.portfolioservice.exception.AccessDeniedException if the caller is not an admin nor the owner.
      */
+    @Operation(summary = "Get a user's portfolio",
+            description = "Returns any user's portfolio. Admins can access any user; users only their own.")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Portfolio returned"),
+            @ApiResponse(responseCode = "403", description = "Access denied")
+    })
     @GetMapping("/{userId}")
     public ResponseEntity<PortfolioResponse> getPortfolio(
-            @PathVariable String userId,
+            @Parameter(description = "Target user identifier", required = true) @PathVariable String userId,
+            @Parameter(description = "Authenticated user id injected by the gateway", required = true)
             @RequestHeader("X-User-Id") String requesterId,
+            @Parameter(description = "Authenticated user role injected by the gateway", required = true)
             @RequestHeader("X-User-Role") String role) {
 
         authorizationGuard.requireOwnerOrAdmin(requesterId, role, userId);

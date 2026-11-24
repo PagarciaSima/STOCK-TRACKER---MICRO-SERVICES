@@ -12,6 +12,11 @@ import com.trading.notification.service.dto.NotificationTestRequest;
 import com.trading.notification.service.dto.NotificationTestResponse;
 import com.trading.notification.service.service.NotificationSender;
 
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import io.swagger.v3.oas.annotations.responses.ApiResponses;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -20,6 +25,7 @@ import lombok.extern.slf4j.Slf4j;
  * REST controller for manually triggering notifications (useful for testing the
  * configured channel without producing a Kafka event).
  */
+@Tag(name = "Notifications", description = "Manual notification testing (email/SMS/log)")
 @RestController
 @RequestMapping("/api/v1/notifications")
 @RequiredArgsConstructor
@@ -33,17 +39,20 @@ public class NotificationController {
 
     /**
      * Sends a manual test notification through the active channel.
-     * <p>
-     * When called through the API gateway, the authenticated user id is available
-     * in the {@code X-User-Id} header; when called directly on the service port it
-     * falls back to {@code manual-test}.
      *
      * @param userId  the authenticated user id (optional, injected by the gateway).
      * @param request the notification request. Must be valid (non-blank title and message).
      * @return {@code 200 OK} with the result status and the active channel.
      */
+    @Operation(summary = "Send a test notification",
+            description = "Sends a manual notification through the active channel (log/email/sms).")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Notification dispatched"),
+            @ApiResponse(responseCode = "400", description = "Invalid request")
+    })
     @PostMapping("/test")
     public ResponseEntity<NotificationTestResponse> sendTest(
+            @Parameter(description = "Authenticated user id injected by the gateway (optional)")
             @RequestHeader(value = "X-User-Id", required = false) String userId,
             @Valid @RequestBody NotificationTestRequest request) {
 

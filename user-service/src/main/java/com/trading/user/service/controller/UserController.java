@@ -22,6 +22,12 @@ import com.trading.user.service.dto.UserResponse;
 import com.trading.user.service.security.AuthorizationGuard;
 import com.trading.user.service.service.UserService;
 
+import io.swagger.v3.oas.annotations.Hidden;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import io.swagger.v3.oas.annotations.responses.ApiResponses;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 
@@ -32,6 +38,7 @@ import lombok.RequiredArgsConstructor;
  * The authenticated user id and role are received from the API gateway through
  * the {@code X-User-Id} and {@code X-User-Role} headers.
  */
+@Tag(name = "Users", description = "Registration, authentication, profiles and wallet operations")
 @RestController
 @RequestMapping("/api/v1/users")
 @RequiredArgsConstructor
@@ -46,6 +53,11 @@ public class UserController {
      * @param request the registration request. Must be valid (valid email, non-blank password).
      * @return {@code 201 Created} with the {@link AuthResponse}.
      */
+    @Operation(summary = "Register a new user", description = "Creates a user, publishes a Kafka event and returns JWT tokens.")
+    @ApiResponses({
+            @ApiResponse(responseCode = "201", description = "User registered"),
+            @ApiResponse(responseCode = "400", description = "Invalid registration request")
+    })
     @PostMapping("/register")
     public ResponseEntity<AuthResponse> register(
             @Valid @RequestBody RegisterRequest request){
@@ -60,6 +72,12 @@ public class UserController {
      * @param request the login request. Must be valid (valid email, non-blank password).
      * @return {@code 200 OK} with the {@link AuthResponse}.
      */
+    @Operation(summary = "Login", description = "Authenticates a user and returns JWT access and refresh tokens.")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Authenticated"),
+            @ApiResponse(responseCode = "400", description = "Invalid login request"),
+            @ApiResponse(responseCode = "401", description = "Invalid credentials")
+    })
     @PostMapping("/login")
     public ResponseEntity<AuthResponse> login(
             @Valid @RequestBody LoginRequest request){
@@ -72,10 +90,15 @@ public class UserController {
      *
      * @param role the authenticated user's role (from the gateway). Cannot be null.
      * @return {@code 200 OK} with the list of users.
-     * @throws com.trading.user.service.exception.AccessDeniedException if the caller is not an admin.
      */
+    @Operation(summary = "List all users (admin)", description = "Returns all registered users. Requires ADMIN role.")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Users returned"),
+            @ApiResponse(responseCode = "403", description = "Admin privileges required")
+    })
     @GetMapping("/all")
     public ResponseEntity<List<UserResponse>> getAllUsers(
+            @Parameter(description = "Authenticated user role injected by the gateway", required = true)
             @RequestHeader("X-User-Role") String role){
 
         authorizationGuard.requireAdmin(role);
@@ -88,27 +111,36 @@ public class UserController {
      * @param userId the authenticated user id (from the gateway). Cannot be null or blank.
      * @return {@code 200 OK} with the {@link UserResponse}.
      */
+    @Operation(summary = "Get my profile", description = "Returns the authenticated user's profile.")
+    @ApiResponse(responseCode = "200", description = "Profile returned")
     @GetMapping("/me")
     public ResponseEntity<UserResponse> getMyProfile(
+            @Parameter(description = "Authenticated user id injected by the gateway", required = true)
             @RequestHeader("X-User-Id") String userId){
 
         return ResponseEntity.ok(userService.getUserById(userId));
     }
 
     /**
-     * Returns the profile of an arbitrary user by id. Admins can access any user;
-     * a standard user can only access their own profile.
+     * Returns the profile of an arbitrary user by id (admin or owner).
      *
-     * @param userId the identifier of the target user. Cannot be null or blank.
+     * @param userId      the identifier of the target user. Cannot be null or blank.
      * @param requesterId the authenticated user id (from the gateway). Cannot be null or blank.
-     * @param role the authenticated user's role (from the gateway). Cannot be null.
+     * @param role        the authenticated user's role (from the gateway). Cannot be null.
      * @return {@code 200 OK} with the {@link UserResponse}.
-     * @throws com.trading.user.service.exception.AccessDeniedException if the caller is not an admin nor the owner.
      */
+    @Operation(summary = "Get a user by id",
+            description = "Returns a user profile. Admins can access any user; users only their own.")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "User returned"),
+            @ApiResponse(responseCode = "403", description = "Access denied")
+    })
     @GetMapping("/{userId}")
     public ResponseEntity<UserResponse> getUserById(
-            @PathVariable String userId,
+            @Parameter(description = "Target user identifier", required = true) @PathVariable String userId,
+            @Parameter(description = "Authenticated user id injected by the gateway", required = true)
             @RequestHeader("X-User-Id") String requesterId,
+            @Parameter(description = "Authenticated user role injected by the gateway", required = true)
             @RequestHeader("X-User-Role") String role){
 
         authorizationGuard.requireOwnerOrAdmin(requesterId, role, userId);
@@ -116,21 +148,26 @@ public class UserController {
     }
 
     /**
-     * Add funds to a user's wallet. Admins can target any user; a standard user
-     * can only target their own wallet.
+     * Add funds to a user's wallet (admin or owner).
      *
-     * @param userId the identifier of the target user. Cannot be null or blank.
-     * @param amount the amount to add. Cannot be null or negative.
+     * @param userId      the identifier of the target user. Cannot be null or blank.
+     * @param amount      the amount to add. Cannot be null or negative.
      * @param requesterId the authenticated user id (from the gateway). Cannot be null or blank.
-     * @param role the authenticated user's role (from the gateway). Cannot be null.
+     * @param role        the authenticated user's role (from the gateway). Cannot be null.
      * @return a {@link FundsOperationResponse} with the new balance.
-     * @throws com.trading.user.service.exception.AccessDeniedException if the caller is not an admin nor the owner.
      */
+    @Operation(summary = "Add funds", description = "Adds funds to a wallet. Admins can target any user; users only their own.")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Funds added"),
+            @ApiResponse(responseCode = "403", description = "Access denied")
+    })
     @PostMapping("/{userId}/funds/add")
     public ResponseEntity<FundsOperationResponse> addFunds(
-            @PathVariable String userId,
-            @RequestParam BigDecimal amount,
+            @Parameter(description = "Target user identifier", required = true) @PathVariable String userId,
+            @Parameter(description = "Amount to add", required = true) @RequestParam BigDecimal amount,
+            @Parameter(description = "Authenticated user id injected by the gateway", required = true)
             @RequestHeader("X-User-Id") String requesterId,
+            @Parameter(description = "Authenticated user role injected by the gateway", required = true)
             @RequestHeader("X-User-Role") String role){
 
         authorizationGuard.requireOwnerOrAdmin(requesterId, role, userId);
@@ -139,21 +176,26 @@ public class UserController {
     }
 
     /**
-     * Deduct funds from a user's wallet. Admins can target any user; a standard
-     * user can only target their own wallet.
+     * Deduct funds from a user's wallet (admin or owner).
      *
-     * @param userId the identifier of the target user. Cannot be null or blank.
-     * @param amount the amount to deduct. Cannot be null or negative.
+     * @param userId      the identifier of the target user. Cannot be null or blank.
+     * @param amount      the amount to deduct. Cannot be null or negative.
      * @param requesterId the authenticated user id (from the gateway). Cannot be null or blank.
-     * @param role the authenticated user's role (from the gateway). Cannot be null.
+     * @param role        the authenticated user's role (from the gateway). Cannot be null.
      * @return a {@link FundsOperationResponse} with the new balance.
-     * @throws com.trading.user.service.exception.AccessDeniedException if the caller is not an admin nor the owner.
      */
+    @Operation(summary = "Deduct funds", description = "Deducts funds from a wallet. Admins can target any user; users only their own.")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Funds deducted"),
+            @ApiResponse(responseCode = "403", description = "Access denied")
+    })
     @PostMapping("/{userId}/funds/deduct")
     public ResponseEntity<FundsOperationResponse> deductFunds(
-            @PathVariable String userId,
-            @RequestParam BigDecimal amount,
+            @Parameter(description = "Target user identifier", required = true) @PathVariable String userId,
+            @Parameter(description = "Amount to deduct", required = true) @RequestParam BigDecimal amount,
+            @Parameter(description = "Authenticated user id injected by the gateway", required = true)
             @RequestHeader("X-User-Id") String requesterId,
+            @Parameter(description = "Authenticated user role injected by the gateway", required = true)
             @RequestHeader("X-User-Role") String role){
 
         authorizationGuard.requireOwnerOrAdmin(requesterId, role, userId);
@@ -162,21 +204,26 @@ public class UserController {
     }
 
     /**
-     * Credit funds to a user's wallet (used for SELL orders). Admins can target
-     * any user; a standard user can only target their own wallet.
+     * Credit funds to a user's wallet (admin or owner).
      *
-     * @param userId the identifier of the target user. Cannot be null or blank.
-     * @param amount the amount to credit. Cannot be null or negative.
+     * @param userId      the identifier of the target user. Cannot be null or blank.
+     * @param amount      the amount to credit. Cannot be null or negative.
      * @param requesterId the authenticated user id (from the gateway). Cannot be null or blank.
-     * @param role the authenticated user's role (from the gateway). Cannot be null.
+     * @param role        the authenticated user's role (from the gateway). Cannot be null.
      * @return a {@link FundsOperationResponse} with the new balance.
-     * @throws com.trading.user.service.exception.AccessDeniedException if the caller is not an admin nor the owner.
      */
+    @Operation(summary = "Credit funds", description = "Credits funds to a wallet. Admins can target any user; users only their own.")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Funds credited"),
+            @ApiResponse(responseCode = "403", description = "Access denied")
+    })
     @PostMapping("/{userId}/funds/credit")
     public ResponseEntity<FundsOperationResponse> creditFunds(
-            @PathVariable String userId,
-            @RequestParam BigDecimal amount,
+            @Parameter(description = "Target user identifier", required = true) @PathVariable String userId,
+            @Parameter(description = "Amount to credit", required = true) @RequestParam BigDecimal amount,
+            @Parameter(description = "Authenticated user id injected by the gateway", required = true)
             @RequestHeader("X-User-Id") String requesterId,
+            @Parameter(description = "Authenticated user role injected by the gateway", required = true)
             @RequestHeader("X-User-Role") String role){
 
         authorizationGuard.requireOwnerOrAdmin(requesterId, role, userId);
@@ -186,17 +233,17 @@ public class UserController {
 
     // ---------------------------------------------------------------------
     // Internal (service-to-service) endpoints. Not intended for external
-    // clients; blocked at the API gateway (/internal/**). Used by order-service
-    // via Feign to move funds when placing orders.
+    // clients; blocked at the API gateway (/internal/**). Hidden from Swagger.
     // ---------------------------------------------------------------------
 
     /**
-     * Internal: deduct funds from a user's wallet (called by order-service on BUY).
+     * Internal: deduct funds (called by order-service on BUY).
      *
      * @param userId the identifier of the user. Cannot be null or blank.
      * @param amount the amount to deduct. Cannot be null or negative.
      * @return a {@link FundsOperationResponse} with the new balance.
      */
+    @Hidden
     @PostMapping("/internal/{userId}/funds/deduct")
     public ResponseEntity<FundsOperationResponse> internalDeductFunds(
             @PathVariable String userId,
@@ -207,12 +254,13 @@ public class UserController {
     }
 
     /**
-     * Internal: credit funds to a user's wallet (called by order-service on SELL).
+     * Internal: credit funds (called by order-service on SELL).
      *
      * @param userId the identifier of the user. Cannot be null or blank.
      * @param amount the amount to credit. Cannot be null or negative.
      * @return a {@link FundsOperationResponse} with the new balance.
      */
+    @Hidden
     @PostMapping("/internal/{userId}/funds/credit")
     public ResponseEntity<FundsOperationResponse> internalCreditFunds(
             @PathVariable String userId,
