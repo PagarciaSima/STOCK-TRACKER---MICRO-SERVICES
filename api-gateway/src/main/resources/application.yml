@@ -4,8 +4,8 @@ spring:
   cloud:
     gateway:
       routes:
-      
-        # routes
+
+        # PUBLIC ROUTES (no JWT)
         - id: user-service-public
           uri: http://localhost:8081
           predicates:
@@ -18,8 +18,8 @@ spring:
             - Path=/api/v1/users/**
           filters:
             - name: JwtAuthFilter
-    
-         # MARKET-DATA-SERVICE
+
+        # MARKET-DATA-SERVICE
         - id: market-data-service
           uri: http://localhost:8082
           predicates:
@@ -32,15 +32,15 @@ spring:
           uri: ws://localhost:8082
           predicates:
             - Path=/ws/**
-    
+
         # ORDER-SERVICE
         - id: order-service
           uri: http://localhost:8083
           predicates:
             - Path=/api/v1/orders/**
-          filters:              
+          filters:
             - name: JwtAuthFilter
-    
+
         # PORTFOLIO-SERVICE
         - id: portfolio-service
           uri: http://localhost:8084
@@ -48,13 +48,21 @@ spring:
             - Path=/api/v1/portfolio/**
           filters:
             - name: JwtAuthFilter
-    
+
+        # NOTIFICATION-SERVICE
+        - id: notification-service
+          uri: http://localhost:8085
+          predicates:
+            - Path=/api/v1/notifications/**
+          filters:
+            - name: JwtAuthFilter
+
 server:
   port: 8080
 
 jwt:
   secret: qNiwobQFrXWDou6EIWAhman5n771RqZlCltkMgbYptc=
-    
+
 management:
   endpoints:
     web:
