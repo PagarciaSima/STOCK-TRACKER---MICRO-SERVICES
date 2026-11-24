@@ -2,7 +2,7 @@ spring:
   application:
     name: notification-service
   kafka:
-    bootstrap-servers: localhost:9092
+    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
     consumer:
       group-id: notification-service-group
       auto-offset-reset: earliest
@@ -19,9 +19,37 @@ spring:
           value:
             default:
               type: java.util.HashMap
+  # Email (only used when notification.channel=email)
+  mail:
+    host: ${SPRING_MAIL_HOST:smtp.gmail.com}
+    port: ${SPRING_MAIL_PORT:587}
+    username: ${SPRING_MAIL_USERNAME:}
+    password: ${SPRING_MAIL_PASSWORD:}
+    properties:
+      mail:
+        smtp:
+          auth: true
+          starttls:
+            enable: true
 
 server:
-  port: 8085
+  port: ${NOTIFICATION_SERVICE_PORT:8085}
+
+# Notification channel selection: log | email | sms
+notification:
+  channel: ${NOTIFICATION_CHANNEL:log}
+  email:
+    # Demo recipient for email notifications (real impl would resolve per-user)
+    to: ${NOTIFICATION_EMAIL_TO:}
+  sms:
+    # Demo recipient for SMS notifications (must be a Twilio-verified number)
+    to: ${NOTIFICATION_SMS_TO:}
+
+# Twilio SMS configuration (only used when notification.channel=sms)
+twilio:
+  account-sid: ${TWILIO_ACCOUNT_SID:}
+  auth-token: ${TWILIO_AUTH_TOKEN:}
+  phone-number: ${TWILIO_PHONE_NUMBER:}
 
 management:
   endpoints:
