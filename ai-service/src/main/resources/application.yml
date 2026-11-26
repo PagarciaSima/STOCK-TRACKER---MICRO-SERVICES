@@ -1,0 +1,45 @@
+spring:
+  application:
+    name: ai-service
+
+server:
+  port: ${AI_SERVICE_PORT:8086}
+
+ai:
+  # Provider strategy: ollama | gemini | auto (ollama first, then gemini)
+  provider: ${AI_PROVIDER:auto}
+  # Only consult the LLM when the rule engine returns REVIEW (gray zone)
+  consult-on-review: ${AI_CONSULT_ON_REVIEW:true}
+  ollama:
+    enabled: ${OLLAMA_ENABLED:true}
+    base-url: ${OLLAMA_BASE_URL:http://localhost:11434}
+    model: ${OLLAMA_MODEL:llama3.2:3b}
+    timeout-ms: ${OLLAMA_TIMEOUT_MS:8000}
+  gemini:
+    enabled: ${GEMINI_ENABLED:true}
+    base-url: ${GEMINI_BASE_URL:https://generativelanguage.googleapis.com}
+    model: ${GEMINI_MODEL:gemini-3.8-flash}
+    api-key: ${GEMINI_API_KEY:}
+    timeout-ms: ${GEMINI_TIMEOUT_MS:8000}
+  risk:
+    max-order-amount: ${RISK_MAX_ORDER_AMOUNT:50000}
+    balance-ratio-threshold: ${RISK_BALANCE_RATIO:0.5}
+    velocity-window-minutes: ${RISK_VELOCITY_WINDOW_MIN:5}
+    velocity-max-orders: ${RISK_VELOCITY_MAX:20}
+    medium-score-threshold: ${RISK_MEDIUM_THRESHOLD:40}
+    high-score-threshold: ${RISK_HIGH_THRESHOLD:70}
+
+springdoc:
+  api-docs:
+    enabled: true
+    path: /v3/api-docs
+  swagger-ui:
+    enabled: true
+    path: /swagger-ui.html
+  show-actuator: false
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
