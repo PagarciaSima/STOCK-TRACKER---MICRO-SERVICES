@@ -1,10 +1,13 @@
 spring:
+  # Loads the repository-level .env file (KEY=value) as a properties source.
+  config:
+    import: optional:file:../.env[.properties]
   application:
     name: portfolio-service
   datasource:
-    url: jdbc:mysql://localhost:3306/portfolio_fb?createDatabaseIfNotExist=true
-    username: root
-    password: admin
+    url: ${PORTFOLIO_DB_URL:jdbc:mysql://localhost:3306/portfolio_fb?createDatabaseIfNotExist=true}
+    username: ${DB_USERNAME:root}
+    password: ${DB_PASSWORD:admin}
     driver-class-name: com.mysql.cj.jdbc.Driver
   jpa:
     hibernate:
@@ -14,11 +17,11 @@ spring:
       hibernate:
         dialect: org.hibernate.dialect.MySQLDialect
   kafka:
-    bootstrap-servers: localhost:9092
+    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
     consumer:
       group-id: portfolio-service-group
       auto-offset-reset: earliest
-      key-deserializer: org.apache.common.serialization.StringDeserializer
+      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
       value-deserializer: org.springframework.kafka.support.serializer.JsonDeserializer
       properties:
         spring:
@@ -33,11 +36,11 @@ spring:
                 type: java.util.HashMap
 
 server:
-  port: 8084
+  port: ${PORTFOLIO_SERVICE_PORT:8084}
     
 market:
   service:
-    url: http://localhost:8082
+    url: ${MARKET_SERVICE_URL:http://localhost:8082}
 
 management:
   endpoints:

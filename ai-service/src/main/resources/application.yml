@@ -1,4 +1,9 @@
 spring:
+  # Loads the repository-level .env file (KEY=value) as a properties source.
+  # Without this import every ${...} below silently falls back to its default,
+  # so GEMINI_ENABLED=false in .env would be ignored.
+  config:
+    import: optional:file:../.env[.properties]
   application:
     name: ai-service
 

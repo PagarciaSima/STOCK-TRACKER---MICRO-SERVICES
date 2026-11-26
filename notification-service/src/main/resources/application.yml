@@ -1,4 +1,9 @@
 spring:
+  # Loads the repository-level .env file (KEY=value) as a properties source.
+  # Without this import every ${...} below silently falls back to its default,
+  # so the values configured in .env would never reach this service.
+  config:
+    import: optional:file:../.env[.properties]
   application:
     name: notification-service
   kafka:
@@ -6,7 +11,7 @@ spring:
     consumer:
       group-id: notification-service-group
       auto-offset-reset: earliest
-      key-deserializer: org.apache.common.serialization.StringDeserializer
+      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
       value-deserializer: org.springframework.kafka.support.serializer.JsonDeserializer
       properties:
         spring:

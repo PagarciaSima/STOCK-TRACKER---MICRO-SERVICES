@@ -1,10 +1,13 @@
 spring:
+  # Loads the repository-level .env file (KEY=value) as a properties source.
+  config:
+    import: optional:file:../.env[.properties]
   application:
     name: order-service
   datasource:
-    url: jdbc:mysql://localhost:3306/order_db?createDatabaseIfNotExist=true
-    username: root
-    password: admin
+    url: ${ORDER_DB_URL:jdbc:mysql://localhost:3306/order_db?createDatabaseIfNotExist=true}
+    username: ${DB_USERNAME:root}
+    password: ${DB_PASSWORD:admin}
     driver-class-name: com.mysql.cj.jdbc.Driver
   jpa:
     hibernate:
@@ -14,21 +17,27 @@ spring:
       hibernate:
         dialect: org.hibernate.dialect.MySQLDialect
   kafka:
-    bootstrap-servers: localhost:9092
+    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
     producer:
-      key-serializer: org.apache.common.serialization.StringSerializer
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
       value-serializer: org.springframework.kafka.support.serializer.JsonSerializer
 
 server:
-  port: 8083
+  port: ${ORDER_SERVICE_PORT:8083}
 
 market:
   service:
-    url: http://localhost:8082
+    url: ${MARKET_SERVICE_URL:http://localhost:8082}
 
 user:
   service:
-    url: http://localhost:8081
+    url: ${USER_SERVICE_URL:http://localhost:8081}
+
+# Target of AiRiskClient (@FeignClient). Required: without this property the
+# Feign client cannot be created and startup fails with "Could not resolve placeholder".
+ai:
+  service:
+    url: ${AI_SERVICE_URL:http://localhost:8086}
     
 management:
   endpoints:

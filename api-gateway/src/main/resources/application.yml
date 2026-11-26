@@ -1,4 +1,8 @@
 spring:
+  # Loads the repository-level .env file (KEY=value) as a properties source.
+  # `optional:` keeps startup working when the file is absent (CI, production images).
+  config:
+    import: optional:file:../.env[.properties]
   application:
     name: api-gateway
   cloud:
@@ -7,13 +11,13 @@ spring:
 
         # PUBLIC ROUTES (no JWT)
         - id: user-service-public
-          uri: http://localhost:8081
+          uri: "${USER_SERVICE_URI:http://localhost:8081}"
           predicates:
             - Path=/api/v1/users/register, /api/v1/users/login
 
         # USER-SERVICE
         - id: user-service
-          uri: http://localhost:8081
+          uri: "${USER_SERVICE_URI:http://localhost:8081}"
           predicates:
             - Path=/api/v1/users/**
           filters:
@@ -21,7 +25,7 @@ spring:
 
         # MARKET-DATA-SERVICE
         - id: market-data-service
-          uri: http://localhost:8082
+          uri: "${MARKET_SERVICE_URI:http://localhost:8082}"
           predicates:
             - Path=/api/v1/market/**
           filters:
@@ -29,13 +33,13 @@ spring:
 
         # WEBSOCKET
         - id: market-websocket
-          uri: ws://localhost:8082
+          uri: "${MARKET_SERVICE_WS_URI:ws://localhost:8082}"
           predicates:
             - Path=/ws/**
 
         # ORDER-SERVICE
         - id: order-service
-          uri: http://localhost:8083
+          uri: "${ORDER_SERVICE_URI:http://localhost:8083}"
           predicates:
             - Path=/api/v1/orders/**
           filters:
@@ -43,7 +47,7 @@ spring:
 
         # PORTFOLIO-SERVICE
         - id: portfolio-service
-          uri: http://localhost:8084
+          uri: "${PORTFOLIO_SERVICE_URI:http://localhost:8084}"
           predicates:
             - Path=/api/v1/portfolio/**
           filters:
@@ -51,7 +55,7 @@ spring:
 
         # NOTIFICATION-SERVICE
         - id: notification-service
-          uri: http://localhost:8085
+          uri: "${NOTIFICATION_SERVICE_URI:http://localhost:8085}"
           predicates:
             - Path=/api/v1/notifications/**
           filters:
@@ -59,45 +63,48 @@ spring:
 
         # OPENAPI AGGREGATION (public)
         - id: openapi-users
-          uri: http://localhost:8081
+          uri: "${USER_SERVICE_URI:http://localhost:8081}"
           predicates:
             - Path=/v3/api-docs/users
           filters:
             - RewritePath=/v3/api-docs/users, /v3/api-docs
 
         - id: openapi-market-data
-          uri: http://localhost:8082
+          uri: "${MARKET_SERVICE_URI:http://localhost:8082}"
           predicates:
             - Path=/v3/api-docs/market-data
           filters:
             - RewritePath=/v3/api-docs/market-data, /v3/api-docs
 
         - id: openapi-orders
-          uri: http://localhost:8083
+          uri: "${ORDER_SERVICE_URI:http://localhost:8083}"
           predicates:
             - Path=/v3/api-docs/orders
           filters:
             - RewritePath=/v3/api-docs/orders, /v3/api-docs
 
         - id: openapi-portfolio
-          uri: http://localhost:8084
+          uri: "${PORTFOLIO_SERVICE_URI:http://localhost:8084}"
           predicates:
             - Path=/v3/api-docs/portfolio
           filters:
             - RewritePath=/v3/api-docs/portfolio, /v3/api-docs
 
         - id: openapi-notifications
-          uri: http://localhost:8085
+          uri: "${NOTIFICATION_SERVICE_URI:http://localhost:8085}"
           predicates:
             - Path=/v3/api-docs/notifications
           filters:
             - RewritePath=/v3/api-docs/notifications, /v3/api-docs
 
 server:
-  port: 8080
+  port: ${API_GATEWAY_PORT:8080}
 
 jwt:
-  secret: qNiwobQFrXWDou6EIWAhman5n771RqZlCltkMgbYptc=
+  # No default on purpose: the gateway must fail fast when the secret is missing.
+  # Must be the SAME value the user-service signs with, otherwise every token is rejected.
+  # Must be Base64 and decode to at least 32 bytes (HS256 minimum); see .env.
+  secret: ${JWT_SECRET}
 
 springdoc:
   api-docs:
