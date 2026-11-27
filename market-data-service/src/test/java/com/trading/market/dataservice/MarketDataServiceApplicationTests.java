@@ -1,4 +1,4 @@
-package com.trading.market_dataservice;
+package com.trading.market.dataservice;
 
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.test.context.SpringBootTest;
